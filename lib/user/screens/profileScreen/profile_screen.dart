@@ -23,26 +23,6 @@ class _ProfilePageState extends State<ProfilePage> {
   int totalPosts = 0;
   int completedPosts = 0;
 
-  Future<void> _getUserProfilePosts() async {
-    try {
-      String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
-      QuerySnapshot userPostsSnapshot = await FirebaseFirestore.instance
-          .collection('post')
-          .where('userid', isEqualTo: currentUserId)
-          .get();
-
-      List<QueryDocumentSnapshot> userPosts = userPostsSnapshot.docs;
-
-      setState(() {
-        totalPosts = userPosts.length;
-        completedPosts =
-            userPosts.where((doc) => doc['tripCompleted'] == true).length;
-      });
-    } catch (e) {
-      print('Error fetching user posts: $e');
-    }
-  }
-
   Color getBorderColor(String gender) {
     if (gender.toLowerCase() == "male") {
       return Colors.lightBlue;
@@ -51,12 +31,6 @@ class _ProfilePageState extends State<ProfilePage> {
     } else {
       return Colors.yellow.shade600;
     }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _getUserProfilePosts();
   }
 
   @override

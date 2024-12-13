@@ -14,24 +14,23 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Check user authentication and determine the home screen
   Widget home;
   final user = FirebaseAuth.instance.currentUser;
 
   if (user != null) {
-    // Fetch user details from Firestore to determine user type
+
     final adminSnapshot = await FirebaseFirestore.instance
         .collection('admin')
         .where('email', isEqualTo: user.email)
         .get();
 
     if (adminSnapshot.docs.isNotEmpty) {
-      home = AdminScreen(); // Redirect to AdminScreen if user is admin
+      home = AdminScreen(); 
     } else {
-      home = UserScreen(); // Redirect to UserScreen for regular users
+      home = UserScreen(); 
     }
   } else {
-    home = LoginScreen(); // Redirect to LoginScreen if no user is logged in
+    home = LoginScreen();
   }
 
   runApp(MaterialApp(
