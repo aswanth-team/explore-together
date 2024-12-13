@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "282709194220",
+    "project_id": "exploretogether-b34d2",
+    "storage_bucket": "exploretogether-b34d2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:282709194220:android:73b1fba3e60e267b773cc9",
+        "android_client_info": {
+          "package_name": "com.example.chatapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB12Dk2lVzpnYuGisFv0BUqFTznBItUN9k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:282709194220:android:368cf96d75373e04773cc9",
+        "android_client_info": {
+          "package_name": "com.example.explore_together"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB12Dk2lVzpnYuGisFv0BUqFTznBItUN9k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:282709194220:android:ef02f4d6488b06d9773cc9",
+        "android_client_info": {
+          "package_name": "com.example.explore_together_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB12Dk2lVzpnYuGisFv0BUqFTznBItUN9k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
