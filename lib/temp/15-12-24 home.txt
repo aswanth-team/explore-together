@@ -1,0 +1,305 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:string_similarity/string_similarity.dart';
+import '../../../utils/loading.dart';
+import '../userDetailsScreen/others_user_profile.dart';
+import '../userDetailsScreen/post&trip/post&trip/other_user_post_detail_screen.dart';
+
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  HomePageState createState() => HomePageState();
+}
+
+class HomePageState extends State<HomePage> {
+  final TextEditingController _searchController = TextEditingController();
+
+  String _searchQuery = "";
+  List<String> suggestions = [];
+  bool isSearchTriggered = false;
+  bool isLoading = false; // Track loading state
+
+  @override
+  void initState() {
+    super.initState();
+    fetchSuggestions();
+  }
+
+  Future<void> fetchSuggestions() async {
+    final querySnapshot =
+        await FirebaseFirestore.instance.collection('post').get();
+
+    final suggestionSet = <String>{};
+    for (var doc in querySnapshot.docs) {
+      final data = doc.data();
+      suggestionSet.add(data['locationName']);
+      suggestionSet.addAll(List<String>.from(data['visitedPlaces'] ?? []));
+      suggestionSet.addAll(List<String>.from(data['planToVisitPlaces'] ?? []));
+    }
+
+    setState(() {
+      suggestions = suggestionSet.toList();
+    });
+  }
+
+  Stream<QuerySnapshot> getPostsStream() {
+    return FirebaseFirestore.instance.collection('post').snapshots();
+  }
+
+  List<DocumentSnapshot> filterPosts(QuerySnapshot snapshot) {
+    List<DocumentSnapshot> posts = snapshot.docs;
+
+    if (_searchQuery.isEmpty) return posts; // Show all posts if no query
+
+    return posts.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final locationName = data['locationName']?.toString().toLowerCase() ?? "";
+      final visitedPlaces = List<String>.from(data['visitedPlaces'] ?? [])
+          .map((e) => e.toLowerCase())
+          .toList();
+      final planToVisitPlaces =
+          List<String>.from(data['planToVisitPlaces'] ?? [])
+              .map((e) => e.toLowerCase())
+              .toList();
+
+      final allSearchableFields = [
+        locationName,
+        ...visitedPlaces,
+        ...planToVisitPlaces
+      ];
+
+      return allSearchableFields.any((field) =>
+              field.similarityTo(_searchQuery.toLowerCase()) >
+              0.6 // Fuzzy matching
+          );
+    }).toList();
+  }
+
+  Future<Map<String, Map<String, dynamic>>> fetchUsers(
+      List<DocumentSnapshot> posts) async {
+    final userIds = posts.map((post) => post['userid']).toSet();
+
+    // Check if the userIds list is empty before querying Firestore
+    if (userIds.isEmpty) {
+      return {}; // Return an empty map if no user IDs are available
+    }
+
+    final userSnapshots = await FirebaseFirestore.instance
+        .collection('user')
+        .where(FieldPath.documentId, whereIn: userIds.toList())
+        .get();
+
+    return {
+      for (var doc in userSnapshots.docs)
+        doc.id: doc.data() as Map<String, dynamic>
+    };
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose(); // Dispose the controller
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+          title: TextField(
+        controller: _searchController, // Use the controller
+        onChanged: (value) {
+          setState(() {
+            _searchQuery = value;
+            isSearchTriggered = false;
+          });
+        },
+        onSubmitted: (value) {
+          setState(() {
+            _searchQuery = value;
+            isSearchTriggered = true;
+            isLoading = true; // Start loading animation
+          });
+        },
+        decoration: InputDecoration(
+          hintText: 'Search...',
+          prefixIcon: Icon(Icons.search),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    setState(() {
+                      _searchController.clear(); // Clear the controller
+                      _searchQuery = ""; // Clear the search query
+                      isSearchTriggered = false; // Reset search triggered flag
+                      isLoading = false; // Stop loading animation
+                    });
+                  },
+                )
+              : null,
+        ),
+      )),
+      body: Column(
+        children: [
+          if (_searchQuery.isNotEmpty && !isSearchTriggered)
+            Expanded(
+              child: ListView.builder(
+                itemCount: suggestions.length,
+                itemBuilder: (context, index) {
+                  final suggestion = suggestions[index];
+                  if (!suggestion
+                      .toLowerCase()
+                      .contains(_searchQuery.toLowerCase())) {
+                    return SizedBox.shrink();
+                  }
+                  return ListTile(
+                    title: Text(suggestion),
+                    onTap: () {
+                      setState(() {
+                        _searchQuery = suggestion;
+                        isSearchTriggered = true;
+                        isLoading = true; // Start loading animation
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: getPostsStream(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: LoadingAnimation());
+                }
+
+                var posts = filterPosts(snapshot.data!);
+
+                return FutureBuilder<Map<String, Map<String, dynamic>>>(
+                  future: fetchUsers(posts),
+                  builder: (context, userSnapshot) {
+                    if (!userSnapshot.hasData) {
+                      return const Center(child: LoadingAnimation());
+                    }
+
+                    final users = userSnapshot.data!;
+
+                    // If no posts match the search, show a message
+                    if (posts.isEmpty && isSearchTriggered) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            isLoading
+                                ? const LoadingAnimation() // Show loading
+                                : const SizedBox.shrink(),
+                            const SizedBox(height: 20),
+                            const Text(
+                              'No posts found',
+                              style: TextStyle(fontSize: 18),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      itemCount: posts.length,
+                      itemBuilder: (context, index) {
+                        var post = posts[index].data() as Map<String, dynamic>;
+                        String postId = posts[index].id;
+                        String userId = post['userid'];
+
+                        if (!users.containsKey(userId)) return Container();
+
+                        var user = users[userId]!;
+
+                        if (user['isRemoved'] == true) return Container();
+
+                        String locationName = post['locationName'];
+                        String locationDescription =
+                            post['locationDescription'];
+                        List locationImages = post['locationImages'];
+                        bool tripCompleted = post['tripCompleted'];
+                        String tripRating = post['tripRating'].toString();
+
+                        return Card(
+                          margin: const EdgeInsets.all(10),
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PostDetailScreen(
+                                    postId: postId,
+                                    userId: userId,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                InkWell(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => OtherProfilePage(
+                                          userId: userId,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        backgroundImage:
+                                            NetworkImage(user['userimage']),
+                                      ),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        user['username'],
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                SizedBox(height: 10),
+                                Image.network(locationImages[0]),
+                                SizedBox(height: 10),
+                                Text(
+                                  locationName,
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                Text(locationDescription),
+                                SizedBox(height: 10),
+                                if (tripCompleted)
+                                  Container(
+                                    padding: EdgeInsets.all(5),
+                                    color: Colors.green,
+                                    child: Text(
+                                      'Trip Completed',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                Text('Trip Rating: $tripRating'),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

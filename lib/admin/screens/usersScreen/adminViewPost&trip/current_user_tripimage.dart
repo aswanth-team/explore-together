@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
-
 import '../../../../services/user/firebase_tripImages.dart';
 
 class UserTripImagesWidget extends StatefulWidget {
   final String userId;
 
   const UserTripImagesWidget({
-    Key? key,
+    super.key,
     required this.userId,
-  }) : super(key: key);
+  });
 
   @override
   UserTripImagesWidgetState createState() => UserTripImagesWidgetState();
@@ -16,13 +15,13 @@ class UserTripImagesWidget extends StatefulWidget {
 
 class UserTripImagesWidgetState extends State<UserTripImagesWidget> {
   List<String> tripImages = [];
+  final UserTripImageServices _userTripImageServices = UserTripImageServices();
 
   void deleteTripPhoto(String photoUrl, int index) async {
-    await UserTripImageServices().deleteTripPhoto(widget.userId, photoUrl);
+    await _userTripImageServices.deleteTripPhoto(widget.userId, photoUrl);
     setState(() {
       tripImages.removeAt(index);
     });
-    print('Deleted trip photo: $photoUrl at index $index');
   }
 
   @override

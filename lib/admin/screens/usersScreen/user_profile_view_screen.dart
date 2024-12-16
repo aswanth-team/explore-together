@@ -1,44 +1,34 @@
+//inspect view of user profile
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../utils/app_colors.dart';
 import '../../../utils/loading.dart';
-import '../uploadScreen/post_upload.dart';
-import '../uploadScreen/trip_upload.dart';
-import 'edit_profile_screen.dart';
-import 'post&trip/current_user_posts.dart';
-import 'post&trip/current_user_tripimage.dart';
-import 'settingScreen/settings_screen.dart';
+import '../messageScreen/sent_message_screen.dart';
+import 'adminViewPost&trip/current_user_posts.dart';
+import 'adminViewPost&trip/current_user_tripimage.dart';
 
-class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+class OtherProfilePage extends StatefulWidget {
+  final String userId;
+  const OtherProfilePage({super.key, required this.userId});
 
   @override
-  _ProfilePageState createState() => _ProfilePageState();
+  OtherProfilePageState createState() => OtherProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
+class OtherProfilePageState extends State<OtherProfilePage> {
   bool showPosts = true;
   int totalPosts = 0;
   int completedPosts = 0;
 
-  Color getBorderColor(String gender) {
-    if (gender.toLowerCase() == "male") {
-      return Colors.lightBlue;
-    } else if (gender.toLowerCase() == "female") {
-      return Colors.pinkAccent.shade100;
-    } else {
-      return Colors.yellow.shade600;
-    }
-  }
-
   Future<void> _getUserProfilePosts() async {
     try {
-      String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+      String userId = widget.userId;
       QuerySnapshot userPostsSnapshot = await FirebaseFirestore.instance
           .collection('post')
-          .where('userid', isEqualTo: currentUserId)
+          .where('userid', isEqualTo: userId)
           .get();
 
       List<QueryDocumentSnapshot> userPosts = userPostsSnapshot.docs;
@@ -63,26 +53,12 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => SettingsPage()),
-              );
-            },
-          ),
-        ],
+        title: const Text('Profile..'),
       ),
       body: StreamBuilder(
         stream: FirebaseFirestore.instance
             .collection('user')
-            .doc(FirebaseAuth.instance.currentUser?.uid)
+            .doc(widget.userId)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -102,7 +78,6 @@ class _ProfilePageState extends State<ProfilePage> {
           } else if (snapshot.hasData) {
             final profileData = snapshot.data?.data();
             var userImage = profileData!['userimage'];
-            print(profileData);
             return SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -127,9 +102,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                       child: Container(
                                         decoration: BoxDecoration(
                                           border: Border.all(
-                                            color: getBorderColor(profileData[
-                                                    'gender'] ??
-                                                ''), // Use gender to determine border color
+                                            color: AppColors.genderBorderColor(
+                                                profileData['gender'] ??
+                                                    ''), // Use gender to determine border color
                                             width: 1.0, // Set border width
                                           ),
                                           borderRadius: BorderRadius.circular(
@@ -156,15 +131,15 @@ class _ProfilePageState extends State<ProfilePage> {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: getBorderColor(profileData['gender'] ??
-                                    ''), // Dynamically set border color
+                                color: AppColors.genderBorderColor(
+                                    profileData['gender'] ??
+                                        ''), // Dynamically set border color
                                 width: 2, // Border width
                               ),
                             ),
                             child: CircleAvatar(
                               radius: 30,
-                              backgroundImage: NetworkImage(
-                                  userImage), // Use NetworkImage instead of AssetImage
+                              backgroundImage: NetworkImage(userImage),
                               backgroundColor: Colors.black,
                             ),
                           ),
@@ -263,7 +238,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Instagram Icon
                       if ((profileData['instagram']?.isNotEmpty ?? false))
                         IconButton(
                           onPressed: () {
@@ -334,23 +308,22 @@ class _ProfilePageState extends State<ProfilePage> {
                                     0.45, // 45% of the width for each button
                                 child: ElevatedButton(
                                   onPressed: () {
-                                    final userId =
-                                        FirebaseAuth.instance.currentUser?.uid;
-
-                                    if (userId != null) {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (context) =>
-                                                EditProfileScreen(
-                                                    uuid: userId)),
-                                      );
-                                    }
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => SentMessagePage(
+                                          userNameFromPreviousPage:
+                                              profileData['username'],
+                                          disableSendToAll:
+                                              true, // Disable the switch
+                                        ),
+                                      ),
+                                    );
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    foregroundColor: Colors.black,
+                                    foregroundColor: Colors.white,
                                     backgroundColor: Colors
-                                        .white, // Set background color to white
+                                        .greenAccent, // Set background color to white
                                     side: const BorderSide(
                                       color: Colors.black,
                                       width:
@@ -361,7 +334,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                           5), // Decreased border radius
                                     ),
                                   ),
-                                  child: const Text("Edit Profile"),
+                                  child: const Text("Notify"),
                                 ),
                               ),
                               const SizedBox(
@@ -371,29 +344,42 @@ class _ProfilePageState extends State<ProfilePage> {
                                 width: MediaQuery.of(context).size.width *
                                     0.45, // 45% of the width for each button
                                 child: ElevatedButton(
-                                  onPressed: () {
-                                    // Navigate to the settings page when the button is pressed
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (context) => SettingsPage()),
-                                    );
+                                  onPressed: () async {
+                                    // Toggle the 'isRemoved' status in Firestore
+                                    bool currentStatus =
+                                        profileData['isRemoved'] ?? false;
+                                    await FirebaseFirestore.instance
+                                        .collection('user')
+                                        .doc(widget.userId)
+                                        .update({'isRemoved': !currentStatus});
+
+                                    setState(
+                                        () {}); // Refresh the UI after the update
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    foregroundColor: Colors.black,
-                                    backgroundColor: Colors
-                                        .white, // Set background color to white
+                                    foregroundColor: Colors.white,
+                                    backgroundColor: (profileData[
+                                                'isRemoved'] ??
+                                            false)
+                                        ? Colors.greenAccent
+                                        : Colors
+                                            .redAccent, // Change color dynamically
                                     side: const BorderSide(
                                       color: Colors.black,
-                                      width:
-                                          0.3, // Decreased the border width to 1
+                                      width: 0.3, // Border width
                                     ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(
                                           5), // Decreased border radius
                                     ),
                                   ),
-                                  child: const Text("Settings"),
+                                  child: Text(
+                                    (profileData['isRemoved'] ?? false)
+                                        ? "Add"
+                                        : "Remove", // Dynamic button text
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
+                                  ),
                                 ),
                               ),
                             ],
@@ -450,13 +436,9 @@ class _ProfilePageState extends State<ProfilePage> {
                               ),
                               label: const Text(
                                 'Trip Images',
-                                style: TextStyle(
-                                    color: Colors
-                                        .black), // Set the color of the text to black
+                                style: TextStyle(color: Colors.black),
                               ),
                             ),
-
-                            // Underline when Trip Images is selected
                             if (!showPosts)
                               Container(
                                 height: 2,
@@ -469,87 +451,17 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
                   if (showPosts)
-                    UserPostsWidget(
-                        userId: FirebaseAuth.instance.currentUser!.uid)
+                    UserPostsWidget(userId: widget.userId)
                   else
-                    UserTripImagesWidget(
-                        userId: FirebaseAuth.instance.currentUser!.uid)
+                    UserTripImagesWidget(userId: widget.userId)
                 ],
               ),
             );
           } else {
-            return const Text("No data available"); // Handle the no-data case
+            return const Text("No data available");
           }
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          showModalBottomSheet(
-            context: context,
-            backgroundColor: Colors.white, // Set a background color
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ), // Rounded top corners for a smooth look
-            builder: (BuildContext context) {
-              return Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Add a handle to indicate it's a bottom sheet
-                    Container(
-                      height: 4,
-                      width: 40,
-                      margin: EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    ListTile(
-                      leading: Icon(Icons.post_add, color: Colors.blue),
-                      title: Text("Post",
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w500)),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => PostUploader()),
-                        );
-                      },
-                    ),
-                    Divider(),
-                    ListTile(
-                      leading: Icon(Icons.image, color: Colors.green),
-                      title: Text("Uplaod Image",
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w500)),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => ImageUploader()),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
-        },
-        child: const Icon(Icons.add),
-        backgroundColor: Colors.blue,
-        mini: true,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(50), // Makes the FAB round
-        ),
       ),
     );
   }
 }
-
-void main() => runApp(const MaterialApp(
-      home: ProfilePage(),
-    ));

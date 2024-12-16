@@ -27,15 +27,13 @@ class LoadingAnimation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: Container(
-        child: Center(
-          child: Lottie.asset(
-            'assets/LottieAnimations/loading.json', // Path to your Lottie animation file
-            width: 150,
-            height: 150,
-            fit: BoxFit.contain,
-          ),
+    return Container(
+      child: Center(
+        child: Lottie.asset(
+          'assets/LottieAnimations/loading.json', 
+          width: 150,
+          height: 150,
+          fit: BoxFit.contain,
         ),
       ),
     );

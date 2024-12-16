@@ -1,27 +1,28 @@
+//inspect view of user profile
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../utils/loading.dart';
-import '../uploadScreen/post_upload.dart';
-import '../uploadScreen/trip_upload.dart';
-import 'edit_profile_screen.dart';
-import 'post&trip/current_user_posts.dart';
-import 'post&trip/current_user_tripimage.dart';
-import 'settingScreen/settings_screen.dart';
+import '../chatScreen/chating_screen.dart';
+import 'post&trip/post&trip/other_user_posts.dart';
+import 'post&trip/post&trip/other_user_tripimage.dart';
 
-class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+class OtherProfilePage extends StatefulWidget {
+  final String userId;
+  const OtherProfilePage({super.key, required this.userId});
 
   @override
-  _ProfilePageState createState() => _ProfilePageState();
+  _OtherProfilePageState createState() => _OtherProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
+class _OtherProfilePageState extends State<OtherProfilePage> {
   bool showPosts = true;
   int totalPosts = 0;
   int completedPosts = 0;
+  String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
   Color getBorderColor(String gender) {
     if (gender.toLowerCase() == "male") {
@@ -33,9 +34,38 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Future<String> _getOrCreateChatRoom() async {
+    try {
+      final chatQuery = await FirebaseFirestore.instance
+          .collection('chat')
+          .where('user', arrayContains: currentUserId)
+          .get();
+
+      // Check if a chat room already exists
+      for (var doc in chatQuery.docs) {
+        final userIds = doc.data()['user'] as List<dynamic>? ?? [];
+        if (userIds.contains(widget.userId)) {
+          return doc.id; // Return the existing chat room ID
+        }
+      }
+
+      // Create a new chat room if no existing room is found
+      final newChatDoc =
+          await FirebaseFirestore.instance.collection('chat').add({
+        'user': [currentUserId, widget.userId],
+        'latestMessage': '',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      return newChatDoc.id; // Return the new chat room ID
+    } catch (error) {
+      throw Exception('Error creating or retrieving chat room: $error');
+    }
+  }
+
   Future<void> _getUserProfilePosts() async {
     try {
-      String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+      String currentUserId = widget.userId;
       QuerySnapshot userPostsSnapshot = await FirebaseFirestore.instance
           .collection('post')
           .where('userid', isEqualTo: currentUserId)
@@ -63,26 +93,12 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => SettingsPage()),
-              );
-            },
-          ),
-        ],
+        title: Text('Profile..'),
       ),
       body: StreamBuilder(
         stream: FirebaseFirestore.instance
             .collection('user')
-            .doc(FirebaseAuth.instance.currentUser?.uid)
+            .doc(widget.userId)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -333,24 +349,33 @@ class _ProfilePageState extends State<ProfilePage> {
                                 width: MediaQuery.of(context).size.width *
                                     0.45, // 45% of the width for each button
                                 child: ElevatedButton(
-                                  onPressed: () {
-                                    final userId =
-                                        FirebaseAuth.instance.currentUser?.uid;
+                                  onPressed: () async {
+                                    try {
+                                      final chatRoomId =
+                                          await _getOrCreateChatRoom();
 
-                                    if (userId != null) {
+                                      // Navigate to the ChatScreen
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                            builder: (context) =>
-                                                EditProfileScreen(
-                                                    uuid: userId)),
+                                          builder: (_) => ChatScreen(
+                                            currentUserId: currentUserId,
+                                            chatUserId: widget.userId,
+                                            chatRoomId: chatRoomId,
+                                          ),
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(content: Text('Error: $e')),
                                       );
                                     }
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    foregroundColor: Colors.black,
+                                    foregroundColor: Colors.white,
                                     backgroundColor: Colors
-                                        .white, // Set background color to white
+                                        .greenAccent, // Set background color to white
                                     side: const BorderSide(
                                       color: Colors.black,
                                       width:
@@ -361,7 +386,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                           5), // Decreased border radius
                                     ),
                                   ),
-                                  child: const Text("Edit Profile"),
+                                  child: const Text("Chat"),
                                 ),
                               ),
                               const SizedBox(
@@ -371,18 +396,11 @@ class _ProfilePageState extends State<ProfilePage> {
                                 width: MediaQuery.of(context).size.width *
                                     0.45, // 45% of the width for each button
                                 child: ElevatedButton(
-                                  onPressed: () {
-                                    // Navigate to the settings page when the button is pressed
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (context) => SettingsPage()),
-                                    );
-                                  },
+                                  onPressed: () {},
                                   style: ElevatedButton.styleFrom(
-                                    foregroundColor: Colors.black,
+                                    foregroundColor: Colors.white,
                                     backgroundColor: Colors
-                                        .white, // Set background color to white
+                                        .redAccent, // Set background color to white
                                     side: const BorderSide(
                                       color: Colors.black,
                                       width:
@@ -393,7 +411,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                           5), // Decreased border radius
                                     ),
                                   ),
-                                  child: const Text("Settings"),
+                                  child: const Text("Report"),
                                 ),
                               ),
                             ],
@@ -469,11 +487,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
                   if (showPosts)
-                    UserPostsWidget(
-                        userId: FirebaseAuth.instance.currentUser!.uid)
+                    UserPostsWidget(userId: widget.userId)
                   else
-                    UserTripImagesWidget(
-                        userId: FirebaseAuth.instance.currentUser!.uid)
+                    UserTripImagesWidget(userId: widget.userId)
                 ],
               ),
             );
@@ -482,74 +498,6 @@ class _ProfilePageState extends State<ProfilePage> {
           }
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          showModalBottomSheet(
-            context: context,
-            backgroundColor: Colors.white, // Set a background color
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ), // Rounded top corners for a smooth look
-            builder: (BuildContext context) {
-              return Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Add a handle to indicate it's a bottom sheet
-                    Container(
-                      height: 4,
-                      width: 40,
-                      margin: EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    ListTile(
-                      leading: Icon(Icons.post_add, color: Colors.blue),
-                      title: Text("Post",
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w500)),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => PostUploader()),
-                        );
-                      },
-                    ),
-                    Divider(),
-                    ListTile(
-                      leading: Icon(Icons.image, color: Colors.green),
-                      title: Text("Uplaod Image",
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w500)),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => ImageUploader()),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
-        },
-        child: const Icon(Icons.add),
-        backgroundColor: Colors.blue,
-        mini: true,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(50), // Makes the FAB round
-        ),
-      ),
     );
   }
 }
-
-void main() => runApp(const MaterialApp(
-      home: ProfilePage(),
-    ));

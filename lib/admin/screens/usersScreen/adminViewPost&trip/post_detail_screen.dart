@@ -1,14 +1,10 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import '../../../../services/post/firebase_post.dart';
 import '../../../../services/user/user_services.dart';
-import '../../../../utils/app_colors.dart';
+import '../../../../user/screens/profileScreen/post&trip/post_image_swipe.dart';
+import '../../../../user/screens/userDetailsScreen/others_user_profile.dart';
 import '../../../../utils/loading.dart';
-import '../../userDetailsScreen/others_user_profile.dart';
-import '../../user_screen.dart';
-import 'post_complete_screen.dart';
-import 'post_image_swipe.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final String postId;
@@ -27,6 +23,7 @@ class PostDetailScreen extends StatefulWidget {
 class _PostDetailScreenState extends State<PostDetailScreen> {
   final UserService _userService = UserService();
   final UserPostServices _userPostServices = UserPostServices();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -35,7 +32,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       ),
       body: FutureBuilder(
         future: Future.wait([
-          _userService.fetchUserDetails(userId: widget.userId),
+          _userService.fetchUserDetails(
+              userId: widget.userId), // Fetch user details
           _userPostServices.fetchPostDetails(postId: widget.postId),
         ]),
         builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
@@ -76,9 +74,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     Row(
                       children: [
                         GestureDetector(
-                          onTap: () {
-                            // Navigate to the UsersProfilePage when the image is tapped
-                          },
+                          onTap: () {},
                           child: CircleAvatar(
                             radius: 30.0,
                             backgroundImage: NetworkImage(userimage),
@@ -120,14 +116,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           children: [
                             Text(
                               'Trip to $locationName ',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 8.0),
+                            const SizedBox(height: 8.0),
                             // Container ensures wrapping and centers content
-                            Container(
+                            SizedBox(
                               width: MediaQuery.of(context).size.width *
                                   0.8, // Limit width for wrapping
                               child: Text(
@@ -139,32 +135,32 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                 maxLines: 3, // Limit the number of lines
                                 overflow: TextOverflow
                                     .ellipsis, // Show ellipsis if text overflows
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 10,
                                 ),
                               ),
                             ),
-                            SizedBox(height: 10.0),
+                            const SizedBox(height: 10.0),
                           ],
                         ),
                       ],
                     ),
-                    Divider(
+                    const Divider(
                       color: Colors.black, // Color of the line
                       thickness: 2.0, // Thickness of the line
                       indent: 20.0, // Space before the line
                       endIndent: 20.0, // Space after the line
                     ),
-                    SizedBox(height: 10.0),
+                    const SizedBox(height: 10.0),
                     if (!isTripCompleted) ...[
                       Center(
                         child: Text(
                           'Trip Duration Plan : $tripDuration days',
-                          style: TextStyle(
+                          style: const TextStyle(
                               fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                       ),
-                      SizedBox(height: 8.0),
+                      const SizedBox(height: 8.0),
                       if (planToVisitPlaces.isNotEmpty) ...[
                         Padding(
                           padding: const EdgeInsets.all(8.0),
@@ -234,7 +230,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           ),
                         ),
                       ],
-                      SizedBox(height: 8.0),
+                      const SizedBox(height: 8.0),
                     ],
 
                     // Trip completion details
@@ -242,7 +238,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       Container(
                         width: double
                             .infinity, // Makes the container take up full width
-                        padding: EdgeInsets.all(8.0),
+                        padding: const EdgeInsets.all(8.0),
                         decoration: BoxDecoration(
                           color: Colors.green[100],
                           borderRadius: BorderRadius.circular(12),
@@ -263,7 +259,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                   fontWeight: FontWeight.bold,
                                   color: Colors.green),
                             ),
-                            SizedBox(height: 8.0),
+                            const SizedBox(height: 8.0),
                             if (tripBuddies.isNotEmpty) ...[
                               GridView.builder(
                                 shrinkWrap: true,
@@ -285,30 +281,43 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                         String gender =
                                             buddy['gender'].toLowerCase();
 
+                                        // Determine grid background color based on gender
+                                        Color gridColor;
+                                        switch (gender) {
+                                          case 'male':
+                                            gridColor = const Color.fromARGB(
+                                                255,
+                                                186,
+                                                224,
+                                                255); // Blue for male
+                                            break;
+                                          case 'female':
+                                            gridColor = const Color.fromARGB(
+                                                255,
+                                                255,
+                                                224,
+                                                252); // Rose (pink) for female
+                                            break;
+                                          default:
+                                            gridColor = const Color.fromARGB(
+                                                255,
+                                                255,
+                                                253,
+                                                237); // Yellow for other or unknown genders
+                                            break;
+                                        }
+
                                         return GestureDetector(
                                           onTap: () {
-                                            if (buddyUserId !=
-                                                FirebaseAuth.instance
-                                                    .currentUser?.uid) {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      OtherProfilePage(
-                                                    userId: buddyUserId,
-                                                  ),
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    OtherProfilePage(
+                                                  userId: buddyUserId,
                                                 ),
-                                              );
-                                            } else {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      UserScreen(
-                                                          initialIndex: 4),
-                                                ),
-                                              );
-                                            }
+                                              ),
+                                            );
                                           },
                                           child: Card(
                                             elevation: 5.0,
@@ -316,8 +325,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                               borderRadius:
                                                   BorderRadius.circular(10.0),
                                             ),
-                                            color: AppColors.genderBorderColor(
-                                                gender), // Set grid background color based on gender
+                                            color:
+                                                gridColor, // Set grid background color based on gender
                                             child: Column(
                                               children: [
                                                 const SizedBox(
@@ -342,12 +351,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                             ),
                                           ),
                                         );
+                                        // ... rest of the code ...
                                       } else if (snapshot.hasError) {
                                         return Center(
                                             child: Text(
                                                 'Error: ${snapshot.error}'));
                                       }
-                                      return const SizedBox();
+                                      return const SizedBox(); // Return a placeholder widget while loading
                                     },
                                   );
                                 },
@@ -426,7 +436,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                   ],
                                 ),
                               ),
-                            SizedBox(height: 8.0),
+                            const SizedBox(height: 8.0),
                             if (tripRating != null)
                               RatingBar.builder(
                                 initialRating: tripRating,
@@ -443,18 +453,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                   print(rating);
                                 },
                               ),
-                            SizedBox(height: 20.0),
+                            const SizedBox(height: 20.0),
                             if (tripFeedback != null)
                               Text(
                                 'Feedback : $tripFeedback',
-                                style: TextStyle(fontSize: 16),
+                                style: const TextStyle(fontSize: 16),
                               ),
-                            SizedBox(height: 8.0),
+                            const SizedBox(height: 8.0),
                           ],
                         ),
                       ),
                     ],
-
                     Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: Row(
@@ -488,41 +497,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 15),
-                          // Adds small space between buttons
-                          if (!isTripCompleted)
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => PostCompleteScreen(
-                                      postId: widget.postId,
-                                    ),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(
-                                Icons.done,
-                                color: Colors.white,
-                              ),
-                              label: const Text(
-                                'complete',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors
-                                    .green, // Blue background color for the second button
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
                         ],
                       ),
                     ),
@@ -531,7 +505,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               ),
             );
           } else {
-            return Center(child: Text('No data found.'));
+            return const Center(child: Text('No data found.'));
           }
         },
       ),

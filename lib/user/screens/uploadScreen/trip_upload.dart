@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../../services/user/cloudinary_upload.dart';
+import '../../../services/cloudinary_upload.dart';
 import '../../../utils/loading.dart';
 
 class ImageUploader extends StatefulWidget {
@@ -84,7 +84,10 @@ class _ImageUploaderState extends State<ImageUploader> {
     } catch (e) {
       print('Error saving to Firestore: $e');
     } finally {
-      Navigator.pop(context);
+      Navigator.pop(context); // Close the bottom sheet
+      Future.delayed(Duration(milliseconds: 300), () {
+        Navigator.pop(context); // Go back to the previous screen
+      });
     }
   }
 

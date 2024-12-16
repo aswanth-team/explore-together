@@ -16,7 +16,7 @@ class SettingsPage extends StatelessWidget {
           ListTile(
             leading: Icon(Icons.support_agent),
             title: Text('Support'),
-            trailing: Icon(Icons.chevron_right), 
+            trailing: Icon(Icons.chevron_right),
             onTap: () {
               Navigator.push(
                 context,
@@ -27,18 +27,18 @@ class SettingsPage extends StatelessWidget {
           ListTile(
             leading: Icon(Icons.help),
             title: Text('Help'),
-            trailing: Icon(Icons.chevron_right), 
+            trailing: Icon(Icons.chevron_right),
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => HelpPage()),
+                MaterialPageRoute(builder: (context) => MainHelpPage()),
               );
             },
           ),
           ListTile(
             leading: Icon(Icons.manage_accounts),
             title: Text('Account Management'),
-            trailing: Icon(Icons.chevron_right), 
+            trailing: Icon(Icons.chevron_right),
             onTap: () {
               Navigator.push(
                 context,

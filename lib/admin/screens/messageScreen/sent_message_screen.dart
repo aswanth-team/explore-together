@@ -17,21 +17,18 @@ class SentMessagePage extends StatefulWidget {
 class _SentMessagePageState extends State<SentMessagePage> {
   TextEditingController _messageController = TextEditingController();
   String selectedUserName = '';
-  bool sendToAll = true; // Default is set to true (send to all users)
+  bool sendToAll = true;
 
   get http => null;
 
   @override
   void initState() {
     super.initState();
-    // If a userName is passed from the previous page, set it in the userName field
     if (widget.userNameFromPreviousPage != null) {
       selectedUserName = widget.userNameFromPreviousPage!;
     }
-
-    // If the passed flag is true, disable the "Send to all" switch
     if (widget.disableSendToAll) {
-      sendToAll = false; // Automatically disable "Send to all"
+      sendToAll = false;
     }
   }
 
@@ -45,8 +42,6 @@ class _SentMessagePageState extends State<SentMessagePage> {
       );
       return false;
     }
-
-    // If sendToAll is false, validate that a specific user userName is provided
     if (!sendToAll && selectedUserName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('enter the userName')),
@@ -60,32 +55,26 @@ class _SentMessagePageState extends State<SentMessagePage> {
   // Function to send a notification
   Future<void> sendNotification() async {
     if (!validateInput()) {
-      return; // If validation fails, stop the function
+      return;
     }
     String message = _messageController.text;
-
-    // Send notification to all users or specific user
     if (sendToAll) {
-      // Send notification to all userName
       FirebaseFirestore.instance
           .collection('user_userName')
           .get()
           .then((snapshot) {
         snapshot.docs.forEach((doc) {
           String userName = doc['userName'];
-          // Call a function to send notification to this userName
           sendFCMNotification(userName, message);
         });
       });
     } else {
-      // Send notification to a specific user (using theiruserName)
       sendFCMNotification(selectedUserName, message);
     }
   }
 
   // Function to send FCM notification
   Future<void> sendFCMNotification(String userName, String message) async {
-    // Use Firebase Cloud Messaging HTTP API to send a notification
     var response = await http.post(
       Uri.parse('https://fcm.googleapis.com/fcm/send'),
       headers: <String, String>{

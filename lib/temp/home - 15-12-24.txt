@@ -1,0 +1,172 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+
+import '../userDetailsScreen/others_user_profile.dart';
+import '../userDetailsScreen/post&trip/post&trip/other_user_post_detail_screen.dart';
+
+class HomePage extends StatefulWidget {
+  @override
+  _HomePageState createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  String _searchQuery = "";
+  late Stream<QuerySnapshot> postsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    postsStream = FirebaseFirestore.instance.collection('post').snapshots();
+  }
+
+  Stream<QuerySnapshot> getFilteredPosts(String searchQuery) {
+    if (searchQuery.isEmpty) {
+      return FirebaseFirestore.instance.collection('post').snapshots();
+    } else {
+      return FirebaseFirestore.instance
+          .collection('post')
+          .where('locationName', isEqualTo: searchQuery)
+          .snapshots();
+    }
+  }
+
+  List<DocumentSnapshot> shufflePosts(QuerySnapshot snapshot) {
+    List<DocumentSnapshot> posts = snapshot.docs;
+    posts.shuffle();
+    return posts;
+  }
+
+  Future<Map<String, Map<String, dynamic>>> fetchUsers(
+      List<DocumentSnapshot> posts) async {
+    final userIds = posts.map((post) => post['userid']).toSet();
+
+    final userSnapshots = await FirebaseFirestore.instance
+        .collection('user')
+        .where(FieldPath.documentId, whereIn: userIds.toList())
+        .get();
+
+    return {
+      for (var doc in userSnapshots.docs)
+        doc.id: doc.data() as Map<String, dynamic>
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Posts Feed"),
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: getFilteredPosts(_searchQuery),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          var posts = shufflePosts(snapshot.data!);
+
+          return FutureBuilder<Map<String, Map<String, dynamic>>>(
+            future: fetchUsers(posts),
+            builder: (context, userSnapshot) {
+              if (!userSnapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final users = userSnapshot.data!;
+
+              return ListView.builder(
+                itemCount: posts.length,
+                itemBuilder: (context, index) {
+                  var post = posts[index].data() as Map<String, dynamic>;
+                  String postId = posts[index].id;
+                  String userId = post['userid'];
+
+                  if (!users.containsKey(userId)) return Container();
+
+                  var user = users[userId]!;
+                  if (user['isRemoved'] == true) return Container();
+
+                  String locationName = post['locationName'];
+                  String locationDescription = post['locationDescription'];
+                  List locationImages = post['locationImages'];
+                  bool tripCompleted = post['tripCompleted'];
+                  String tripRating = post['tripRating'].toString();
+
+                  return Card(
+                    margin: const EdgeInsets.all(10),
+                    child: InkWell(
+                      onTap: () {
+                        // Navigate to PostDetailScreen when tapping on the card
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PostDetailScreen(
+                              postId: postId,
+                              userId: userId,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          InkWell(
+                            onTap: () {
+                              // Navigate to OtherProfilePage when tapping the user image
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => OtherProfilePage(
+                                    userId: userId,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundImage:
+                                      NetworkImage(user['userimage']),
+                                ),
+                                SizedBox(width: 10),
+                                Text(
+                                  user['username'],
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: 10),
+                          Image.network(locationImages[0]),
+                          SizedBox(height: 10),
+                          Text(
+                            locationName,
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          Text(locationDescription),
+                          SizedBox(height: 10),
+                          if (tripCompleted)
+                            Container(
+                              padding: EdgeInsets.all(5),
+                              color: Colors.green,
+                              child: Text(
+                                'Trip Completed',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          Text('Trip Rating: $tripRating'),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}

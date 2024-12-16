@@ -1,14 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
-import '../../../../services/post/firebase_post.dart';
-import '../../../../services/user/user_services.dart';
-import '../../../../utils/app_colors.dart';
-import '../../../../utils/loading.dart';
-import '../../userDetailsScreen/others_user_profile.dart';
-import '../../user_screen.dart';
-import 'post_complete_screen.dart';
-import 'post_image_swipe.dart';
+import '../../../../../services/post/firebase_post.dart';
+import '../../../../../services/user/user_services.dart';
+import '../../../../../utils/loading.dart';
+import '../../../profileScreen/post&trip/post_image_swipe.dart';
+import '../../../user_screen.dart';
+import '../../others_user_profile.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final String postId;
@@ -27,12 +25,11 @@ class PostDetailScreen extends StatefulWidget {
 class _PostDetailScreenState extends State<PostDetailScreen> {
   final UserService _userService = UserService();
   final UserPostServices _userPostServices = UserPostServices();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Post Details'),
-      ),
+      appBar: AppBar(title: const Text('Post Details')),
       body: FutureBuilder(
         future: Future.wait([
           _userService.fetchUserDetails(userId: widget.userId),
@@ -62,7 +59,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
             final tripFeedback = postData['tripFeedback'];
             final tripBuddies = postData['tripBuddies'] ?? ['user1', 'user2'];
-            final locationImages = postData['locationImages'] ?? [];
+            final locationImages = postData['locationImages'] ??
+                [
+                  'https://res.cloudinary.com/dakew8wni/image/upload/v1734019072/public/postimages/mwtjtugc4ppu02vwiv49.png'
+                ];
             final visitedPalaces = postData['visitedPlaces'] ?? [];
             final planToVisitPlaces = postData['planToVisitPlaces'];
 
@@ -77,7 +77,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       children: [
                         GestureDetector(
                           onTap: () {
-                            // Navigate to the UsersProfilePage when the image is tapped
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => OtherProfilePage(
+                                  userId: widget.userId,
+                                ),
+                              ),
+                            );
                           },
                           child: CircleAvatar(
                             radius: 30.0,
@@ -89,7 +96,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              username, // Display full name
+                              username,
                               style: const TextStyle(
                                   fontSize: 18.0, fontWeight: FontWeight.bold),
                             ),
@@ -105,12 +112,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
                     const SizedBox(height: 16.0),
 
-                    // Post details
                     Row(
-                      mainAxisAlignment: MainAxisAlignment
-                          .center, // Centers content horizontally
-                      crossAxisAlignment: CrossAxisAlignment
-                          .center, // Centers content vertically (if needed)
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Column(
                           mainAxisAlignment: MainAxisAlignment
@@ -120,14 +124,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           children: [
                             Text(
                               'Trip to $locationName ',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 8.0),
+                            const SizedBox(height: 8.0),
                             // Container ensures wrapping and centers content
-                            Container(
+                            SizedBox(
                               width: MediaQuery.of(context).size.width *
                                   0.8, // Limit width for wrapping
                               child: Text(
@@ -139,32 +143,32 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                 maxLines: 3, // Limit the number of lines
                                 overflow: TextOverflow
                                     .ellipsis, // Show ellipsis if text overflows
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 10,
                                 ),
                               ),
                             ),
-                            SizedBox(height: 10.0),
+                            const SizedBox(height: 10.0),
                           ],
                         ),
                       ],
                     ),
-                    Divider(
+                    const Divider(
                       color: Colors.black, // Color of the line
                       thickness: 2.0, // Thickness of the line
                       indent: 20.0, // Space before the line
                       endIndent: 20.0, // Space after the line
                     ),
-                    SizedBox(height: 10.0),
+                    const SizedBox(height: 10.0),
                     if (!isTripCompleted) ...[
                       Center(
                         child: Text(
                           'Trip Duration Plan : $tripDuration days',
-                          style: TextStyle(
+                          style: const TextStyle(
                               fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                       ),
-                      SizedBox(height: 8.0),
+                      const SizedBox(height: 8.0),
                       if (planToVisitPlaces.isNotEmpty) ...[
                         Padding(
                           padding: const EdgeInsets.all(8.0),
@@ -234,7 +238,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           ),
                         ),
                       ],
-                      SizedBox(height: 8.0),
+                      const SizedBox(height: 8.0),
                     ],
 
                     // Trip completion details
@@ -242,7 +246,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       Container(
                         width: double
                             .infinity, // Makes the container take up full width
-                        padding: EdgeInsets.all(8.0),
+                        padding: const EdgeInsets.all(8.0),
                         decoration: BoxDecoration(
                           color: Colors.green[100],
                           borderRadius: BorderRadius.circular(12),
@@ -263,7 +267,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                   fontWeight: FontWeight.bold,
                                   color: Colors.green),
                             ),
-                            SizedBox(height: 8.0),
+                            const SizedBox(height: 8.0),
                             if (tripBuddies.isNotEmpty) ...[
                               GridView.builder(
                                 shrinkWrap: true,
@@ -284,6 +288,32 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                         final buddy = snapshot.data!;
                                         String gender =
                                             buddy['gender'].toLowerCase();
+
+                                        // Determine grid background color based on gender
+                                        Color gridColor;
+                                        switch (gender) {
+                                          case 'male':
+                                            gridColor = const Color.fromARGB(
+                                                255,
+                                                186,
+                                                224,
+                                                255); // Blue for male
+                                            break;
+                                          case 'female':
+                                            gridColor = const Color.fromARGB(
+                                                255,
+                                                255,
+                                                224,
+                                                252); // Rose (pink) for female
+                                            break;
+                                          default:
+                                            gridColor = const Color.fromARGB(
+                                                255,
+                                                255,
+                                                253,
+                                                237); // Yellow for other or unknown genders
+                                            break;
+                                        }
 
                                         return GestureDetector(
                                           onTap: () {
@@ -316,8 +346,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                               borderRadius:
                                                   BorderRadius.circular(10.0),
                                             ),
-                                            color: AppColors.genderBorderColor(
-                                                gender), // Set grid background color based on gender
+                                            color:
+                                                gridColor, // Set grid background color based on gender
                                             child: Column(
                                               children: [
                                                 const SizedBox(
@@ -342,12 +372,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                             ),
                                           ),
                                         );
+                                        // ... rest of the code ...
                                       } else if (snapshot.hasError) {
                                         return Center(
                                             child: Text(
                                                 'Error: ${snapshot.error}'));
                                       }
-                                      return const SizedBox();
+                                      return const SizedBox(); // Return a placeholder widget while loading
                                     },
                                   );
                                 },
@@ -426,7 +457,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                   ],
                                 ),
                               ),
-                            SizedBox(height: 8.0),
+                            const SizedBox(height: 8.0),
                             if (tripRating != null)
                               RatingBar.builder(
                                 initialRating: tripRating,
@@ -443,95 +474,23 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                   print(rating);
                                 },
                               ),
-                            SizedBox(height: 20.0),
+                            const SizedBox(height: 20.0),
                             if (tripFeedback != null)
                               Text(
                                 'Feedback : $tripFeedback',
-                                style: TextStyle(fontSize: 16),
+                                style: const TextStyle(fontSize: 16),
                               ),
-                            SizedBox(height: 8.0),
+                            const SizedBox(height: 8.0),
                           ],
                         ),
                       ),
                     ],
-
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment
-                            .center, // This centers the content in the Row
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: () async {
-                              await UserPostServices()
-                                  .deletePost(widget.postId);
-                              Navigator.pop(context);
-                            },
-                            icon: const Icon(
-                              Icons.remove_circle_outline,
-                              color: Colors.white,
-                            ),
-                            label: const Text(
-                              'Remove',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  Colors.red, // Red background color
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 15),
-                          // Adds small space between buttons
-                          if (!isTripCompleted)
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => PostCompleteScreen(
-                                      postId: widget.postId,
-                                    ),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(
-                                Icons.done,
-                                color: Colors.white,
-                              ),
-                              label: const Text(
-                                'complete',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors
-                                    .green, // Blue background color for the second button
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
             );
           } else {
-            return Center(child: Text('No data found.'));
+            return const Center(child: Text('No data found.'));
           }
         },
       ),

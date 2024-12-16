@@ -46,7 +46,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         color: Colors.white,
         fontWeight: FontWeight.bold,
       ),
-      floatingLabelBehavior: FloatingLabelBehavior.never,
+      //  floatingLabelBehavior: FloatingLabelBehavior.never,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: const BorderSide(color: Colors.white, width: 2),
@@ -191,6 +191,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         email: emailController.text,
         password: passwordController.text,
         aadharno: aadharController.text,
+        location: locationController.text,
       );
     } catch (e) {
       throw Exception("Failed to store user details: $e");

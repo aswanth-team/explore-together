@@ -4,7 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 
-import '../../../services/user/cloudinary_upload.dart';
+import '../../../services/cloudinary_upload.dart';
 import '../../../utils/loading.dart';
 
 class PostUploader extends StatefulWidget {
@@ -81,6 +81,11 @@ class _PostUploaderState extends State<PostUploader> {
       return;
     }
 
+    final String remainingTag = _tagController.text.trim();
+    if (remainingTag.isNotEmpty) {
+      _addTag(remainingTag);
+    }
+
     setState(() {
       _isPosting = true;
     });
@@ -88,12 +93,16 @@ class _PostUploaderState extends State<PostUploader> {
     List<String> uploadedImageUrls = [];
 
     try {
+      // Upload images asynchronously
       for (File image in _selectedImages) {
         final response = await CloudinaryService(uploadPreset: 'postImages')
             .uploadImage(selectedImage: image);
-        uploadedImageUrls.add(response!);
+        if (response != null) {
+          uploadedImageUrls.add(response);
+        }
       }
 
+      // Prepare post data
       final postData = {
         'locationName': _locationName,
         'locationDescription': _locationDescription,
@@ -109,18 +118,32 @@ class _PostUploaderState extends State<PostUploader> {
         'uploadedDateTime': DateTime.now().toIso8601String()
       };
 
+      // Upload post data to Firestore
       await FirebaseFirestore.instance.collection('post').add(postData);
+
       setState(() {
         _selectedImages.clear();
         _tags.clear();
       });
+
+      // Show success and navigate back
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Post successfully uploaded!")),
+      );
     } catch (e) {
       print('Error uploading post: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to upload post. Please try again.")),
+      );
     } finally {
       setState(() {
         _isPosting = false;
       });
-      Navigator.pop(context);
+
+      Navigator.pop(context); // Close the bottom sheet
+      Future.delayed(const Duration(milliseconds: 300), () {
+        Navigator.pop(context); // Go back to the previous screen
+      });
     }
   }
 

@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
-
-import '../../../../services/user/firebase_tripImages.dart';
+import '../../../../../services/user/firebase_tripImages.dart';
 
 class UserTripImagesWidget extends StatefulWidget {
   final String userId;
 
   const UserTripImagesWidget({
-    Key? key,
+    super.key,
     required this.userId,
-  }) : super(key: key);
+  });
 
   @override
   UserTripImagesWidgetState createState() => UserTripImagesWidgetState();
@@ -17,15 +16,6 @@ class UserTripImagesWidget extends StatefulWidget {
 class UserTripImagesWidgetState extends State<UserTripImagesWidget> {
   List<String> tripImages = [];
 
-  void deleteTripPhoto(String photoUrl, int index) async {
-    await UserTripImageServices().deleteTripPhoto(widget.userId, photoUrl);
-    setState(() {
-      tripImages.removeAt(index);
-    });
-    print('Deleted trip photo: $photoUrl at index $index');
-  }
-
-  @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<String>>(
       stream: UserTripImageServices().fetchUserTripImagesStream(widget.userId),
@@ -66,7 +56,6 @@ class UserTripImagesWidgetState extends State<UserTripImagesWidget> {
           itemBuilder: (context, index) {
             return GestureDetector(
               onTap: () {
-                // Show the image in a dialog when clicked
                 showDialog(
                   context: context,
                   builder: (BuildContext context) {
@@ -109,42 +98,7 @@ class UserTripImagesWidgetState extends State<UserTripImagesWidget> {
                     fit: BoxFit.cover,
                     width: double.infinity,
                     height: double.infinity,
-                  ),
-                  Positioned(
-                    top: 5,
-                    right: 5,
-                    child: PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert, color: Colors.white),
-                      onSelected: (value) {
-                        if (value == 'delete') {
-                          deleteTripPhoto(tripImages[index], index);
-                        }
-                      },
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.0),
-                      ),
-                      color: Colors.grey[800],
-                      elevation: 8,
-                      itemBuilder: (BuildContext context) => [
-                        const PopupMenuItem<String>(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete, color: Colors.red),
-                              SizedBox(width: 8),
-                              Text(
-                                'Delete',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  )
                 ],
               ),
             );

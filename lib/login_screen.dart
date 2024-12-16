@@ -2,8 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'admin/screens/admin_screen.dart';
+import 'user/screens/profileScreen/settingScreen/help/help_screen.dart';
 import 'user/screens/userLoginSetup/forget_password_screen.dart';
 import 'user/screens/userLoginSetup/registration_screen.dart';
+import 'user/screens/userManageScreens/temporarly_removed_screen.dart';
 import 'user/screens/user_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -105,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // Redirect to AdminScreen
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => AdminScreen()),
+          MaterialPageRoute(builder: (context) => const AdminScreen()),
         );
         return;
       }
@@ -148,6 +150,18 @@ class _LoginScreenState extends State<LoginScreen> {
       // Retrieve email from the matched user document
       final userData = userSnapshot.docs.first.data() as Map<String, dynamic>;
       final userEmail = userData['email'];
+      final isRemoved = userData['isRemoved'] ?? false;
+
+      if (isRemoved) {
+        setState(() {
+          identifierError = 'Your account has been temporarily removed.';
+          _isLoading = false;
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          showTemporaryRemovedPopup(context);
+        });
+        return;
+      }
 
       // Authenticate with Firebase Auth
       await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -180,13 +194,22 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void showTemporaryRemovedPopup(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const TemporaryRemovedPopup();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
-          // Background Image
           Positioned.fill(
             child: Container(
               decoration: const BoxDecoration(
@@ -195,6 +218,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   fit: BoxFit.cover,
                 ),
               ),
+            ),
+          ),
+          Positioned(
+            top: 16.0, 
+            right: 16.0, 
+            child: IconButton(
+              icon: Icon(Icons.help_outline, color: Colors.white),
+              tooltip: 'Help',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => MainHelpPage()),
+                );
+              },
             ),
           ),
           Center(
@@ -264,49 +301,57 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: const TextStyle(color: Colors.red),
                             ),
                           const SizedBox(height: 5),
-                          TextFormField(
-                            controller: identifierController,
-                            decoration: _inputDecoration(
-                              'Username, email, phone, or Aadhaar',
-                              Icons.person,
+                          SizedBox(
+                            width: 350, // Set width for the DOB field
+                            child: TextFormField(
+                              controller: identifierController,
+                              decoration: _inputDecoration(
+                                'Username, email, phone, or Aadhaar',
+                                Icons.person,
+                              ),
+                              style: const TextStyle(color: Colors.white),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your Username, email, phone, or Aadhaar';
+                                }
+                                return null;
+                              },
                             ),
-                            style: const TextStyle(color: Colors.white),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your Username, email, phone, or Aadhaar';
-                              }
-                              return null;
-                            },
                           ),
                           const SizedBox(height: 20),
-                          TextFormField(
-                            controller: passwordController,
-                            obscureText: _isPasswordHidden,
-                            decoration: _inputDecoration(
-                              'Password',
-                              Icons.lock,
-                            ).copyWith(
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _isPasswordHidden
-                                      ? Icons.visibility
-                                      : Icons.visibility_off,
-                                  color: Colors.white,
+                          SizedBox(
+                            width: 350, // Set width for the DOB field
+                            child: TextFormField(
+                              controller: passwordController,
+                              obscureText: _isPasswordHidden,
+                              decoration: _inputDecoration(
+                                'Password',
+                                Icons.lock,
+                              ).copyWith(
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _isPasswordHidden
+                                        ? Icons.visibility
+                                        : Icons.visibility_off,
+                                    color: Colors.white,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _isPasswordHidden = !_isPasswordHidden;
+                                    });
+                                  },
                                 ),
-                                onPressed: () {
-                                  setState(() {
-                                    _isPasswordHidden = !_isPasswordHidden;
-                                  });
-                                },
                               ),
+                              style: const TextStyle(color: Colors.white),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your password';
+                                } else if (value.length < 6) {
+                                  return 'Password must be at least 6 characters long';
+                                }
+                                return null;
+                              },
                             ),
-                            style: const TextStyle(color: Colors.white),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your password';
-                              }
-                              return null;
-                            },
                           ),
                           const SizedBox(height: 10),
                           Align(

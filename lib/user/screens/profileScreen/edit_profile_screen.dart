@@ -1,8 +1,10 @@
-import 'package:explore_together/services/user/cloudinary_upload.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
+
+import '../../../services/cloudinary_upload.dart';
+import '../../../utils/loading.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final String uuid;
@@ -41,15 +43,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (userDoc.exists) {
       final data = userDoc.data()!;
       setState(() {
-        _currentImageUrl = data['userimage'];
-        _fullNameController.text = data['fullname'];
-        _gender = data['gender'];
-        _dob = DateTime.parse(data['dob']);
-        _locationController.text = data['location'];
-        _bioController.text = data['userbio'];
-        _instagramController.text = data['instagram'];
-        _facebookController.text = data['facebook'];
-        _xController.text = data['x'];
+        _currentImageUrl = data['userimage'] ?? '';
+        _fullNameController.text = data['fullname'] ?? '';
+        _gender = data['gender'] ?? '';
+        _dob = DateTime.parse(data['dob'] ?? '');
+        _locationController.text = data['location'] ?? '';
+        _bioController.text = data['userbio'] ?? '';
+        _instagramController.text = data['instagram'] ?? '';
+        _facebookController.text = data['facebook'] ?? '';
+        _xController.text = data['x'] ?? "";
       });
     }
   }
@@ -88,7 +90,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final updatedData = {
       'fullname': _fullNameController.text,
       'gender': _gender,
-      'dob': _dob?.toIso8601String(),
+      'dob': _dob?.toString(),
       'location': _locationController.text,
       'userbio': _bioController.text,
       'instagram': _instagramController.text,
@@ -241,7 +243,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             Container(
               color: Colors.black54,
               child: const Center(
-                child: CircularProgressIndicator(),
+                child: LoadingAnimation(),
               ),
             ),
         ],

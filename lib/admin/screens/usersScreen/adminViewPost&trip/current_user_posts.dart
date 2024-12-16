@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../services/post/firebase_post.dart';
 import '../../../../utils/loading.dart';
-import 'post_complete_screen.dart';
 import 'post_detail_screen.dart';
 
 class UserPostsWidget extends StatefulWidget {
@@ -18,7 +17,6 @@ class UserPostsWidget extends StatefulWidget {
 
 class UserPostsWidgetState extends State<UserPostsWidget> {
   final UserPostServices _userPostServices = UserPostServices();
-
   void showPostOptions(BuildContext context, Map<String, dynamic> post) {
     showModalBottomSheet(
       context: context,
@@ -27,28 +25,12 @@ class UserPostsWidgetState extends State<UserPostsWidget> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (!(post['tripCompleted'] ?? false))
-                ListTile(
-                  leading: const Icon(Icons.check_circle_outline),
-                  title: const Text('Complete'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => PostCompleteScreen(
-                          postId: post['postId'],
-                        ),
-                      ),
-                    );
-                  },
-                ),
               ListTile(
                 leading: const Icon(Icons.delete_outline),
                 title: const Text('Delete'),
                 onTap: () {
                   Navigator.pop(context);
-                  _userPostServices.deletePost(post['postId']);
+                  UserPostServices().deletePost(post['postId']);
                   setState(() {});
                 },
               ),
@@ -152,8 +134,10 @@ class UserPostsWidgetState extends State<UserPostsWidget> {
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 12,
-                                      color: Colors.black,
-                                      height: 1.2,
+                                      color:
+                                          Colors.black, // Ensuring color is set
+                                      height:
+                                          1.2, // Adjust line height to control spacing
                                     ),
                                   ),
                                 ),

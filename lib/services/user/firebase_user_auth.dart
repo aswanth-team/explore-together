@@ -6,6 +6,9 @@ class UserAuthServices {
   final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
 
+  //-------------------  Register && ForgetPassword   ---------------------//
+
+  //used to Register the credentials in the database
   Future<void> userRegisterInFirebase({
     required BuildContext context,
     required String username,
@@ -16,6 +19,7 @@ class UserAuthServices {
     required String aadharno,
     required String email,
     required String password,
+    required String location,
   }) async {
     try {
       final userCredential = await firebaseAuth.createUserWithEmailAndPassword(
@@ -31,9 +35,16 @@ class UserAuthServices {
         'gender': gender,
         'fullname': fullname,
         'aadharno': aadharno,
+        'tripimages': null,
+        'facebook': null,
+        'instagram': null,
+        'userbio': null,
+        'userimage':
+            'https://res.cloudinary.com/dakew8wni/image/upload/v1733819145/public/userImage/fvv6lbzdjhyrc1fhemaj.jpg',
+        'x': null,
+        'isRemoved': false,
+        'location': location,
       });
-
-      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Registration Successful for $username'),
@@ -41,17 +52,16 @@ class UserAuthServices {
         ),
       );
     } catch (e) {
-      // Handle errors
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content:
-              Text('Registration Unsuccessful for $username: ${e.toString()}'),
+        const SnackBar(
+          content: Text('Registration Unsuccessful'),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
+  //used for check the user credentials is already exist in the database for Registration
   Future<List<String>> checkIfUserExists({
     required String username,
     required String email,
@@ -99,6 +109,7 @@ class UserAuthServices {
     }
   }
 
+  //used for check the user credentials is exist or not in database for Forget Password
   Future<String?> checkUserExistence(String identifier) async {
     try {
       final QuerySnapshot userSnapshot = await firestore
@@ -131,19 +142,24 @@ class UserAuthServices {
         return phoneSnapshot.docs.first.id; // Return user ID
       }
 
-      return null; // No user found
+      return null;
     } catch (e) {
       throw Exception('Error checking user existence: ${e.toString()}');
     }
   }
 
-  Future<void> updatePassword(String userId, String newPassword) async {
+  //used to get the userEmail for Forgetpassword using UserId
+  Future<String?> getUserEmailById(String userId) async {
     try {
-      await firestore.collection('user').doc(userId).update({
-        'password': newPassword,
-      });
+      final userDoc = await firestore.collection('user').doc(userId).get();
+      if (userDoc.exists) {
+        return userDoc.data()?['email'] as String?;
+      } else {
+        return null;
+      }
     } catch (e) {
-      throw Exception('Failed to update password: ${e.toString()}');
+      print('Error fetching user email: $e');
+      return null;
     }
   }
 }

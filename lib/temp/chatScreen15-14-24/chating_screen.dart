@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:rxdart/rxdart.dart';
 import '../../../utils/loading.dart';
 import 'chat_utils.dart';
 
@@ -23,79 +22,49 @@ class ChatScreen extends StatefulWidget {
 class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final TextEditingController _messageController = TextEditingController();
   final ChatCacheManager _cacheManager = ChatCacheManager();
-  final BehaviorSubject<List<Map<String, dynamic>>> _messagesController =
-      BehaviorSubject<List<Map<String, dynamic>>>();
-
   bool isLoading = true;
   bool isUserOnline = false;
   Map<String, dynamic>? userDetails;
-
-  // Pagination variables
-  static const int _messagesPerPage = 50;
-  DocumentSnapshot? _lastDocument;
-  bool _hasMoreMessages = true;
-  final ScrollController _scrollController = ScrollController();
+  List<Map<String, dynamic>> _cachedMessages = [];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializeChat();
-    _setupScrollListener();
-  }
-
-  void _setupScrollListener() {
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels ==
-          _scrollController.position.maxScrollExtent) {
-        _loadMoreMessages();
-      }
-    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _messageController.dispose();
-    _scrollController.dispose();
-    _messagesController.close();
     super.dispose();
   }
 
   Future<void> _initializeChat() async {
-    try {
-      // Initialize database
-      await _cacheManager.initDatabase();
+    await _cacheManager.initDatabase();
 
-      // Fetch user details concurrently
-      final userFuture = FirebaseFirestore.instance
+    try {
+      // Fetch user details
+      final userSnapshot = await FirebaseFirestore.instance
           .collection('user')
           .doc(widget.chatUserId)
           .get();
 
-      final onlineStatusFuture =
-          UserStatusManager.getUserOnlineStatus(widget.chatUserId);
+      // Check user online status
+      final online =
+          await UserStatusManager.getUserOnlineStatus(widget.chatUserId);
 
-      // Load initial cached messages
-      final cachedMessagesFuture = _cacheManager
-          .getCachedMessages(widget.chatRoomId, limit: _messagesPerPage);
+      // Load cached messages
+      final cachedMessages =
+          await _cacheManager.getCachedMessages(widget.chatRoomId);
 
-      // Wait for all futures
-      final results = await Future.wait(
-          [userFuture, onlineStatusFuture, cachedMessagesFuture]);
-
-      // Update state
       setState(() {
-        // Use .data() method correctly
-        userDetails =
-            (results[0] as DocumentSnapshot).data() as Map<String, dynamic>?;
-        isUserOnline = results[1] as bool;
-        _messagesController.add(results[2] as List<Map<String, dynamic>>);
+        userDetails = userSnapshot.data();
+        isUserOnline = online;
+        _cachedMessages = cachedMessages;
         isLoading = false;
       });
-
-      // Start listening to new messages
-      _setupMessageListener();
     } catch (e) {
       print("Error initializing chat: $e");
       setState(() {
@@ -104,112 +73,8 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _setupMessageListener() {
-    FirebaseFirestore.instance
-        .collection('chat/${widget.chatRoomId}/messages')
-        .orderBy('createdAt', descending: true)
-        .limit(_messagesPerPage)
-        .snapshots()
-        .listen((snapshot) {
-      // Update messages and cache simultaneously
-      _updateMessagesWithSnapshot(snapshot);
-    }, onError: (error) {
-      print("Error listening to messages: $error");
-    });
-  }
-
-  void _updateMessagesWithSnapshot(QuerySnapshot snapshot) async {
-    try {
-      // Convert snapshot to messages
-      final liveMessages = snapshot.docs.map((doc) {
-        return {
-          'id': doc.id,
-          'senderId': doc['senderId'],
-          'text': doc['text'],
-          'createdAt': doc['createdAt'] ?? Timestamp.now(),
-        };
-      }).toList();
-
-      // Batch cache new messages
-      await _cacheManager.batchCacheMessages(liveMessages, widget.chatRoomId);
-
-      // Merge with existing messages
-      final currentMessages = _messagesController.value;
-      final mergedMessages = _mergeMessages(currentMessages, liveMessages);
-
-      _messagesController.add(mergedMessages);
-    } catch (e) {
-      print("Error updating messages: $e");
-    }
-  }
-
-  List<Map<String, dynamic>> _mergeMessages(
-      List<Map<String, dynamic>> existingMessages,
-      List<Map<String, dynamic>> newMessages) {
-    final messageMap = <String, Map<String, dynamic>>{};
-
-    // Add existing messages
-    for (var message in existingMessages) {
-      messageMap[message['id']] = message;
-    }
-
-    // Add or update new messages
-    for (var message in newMessages) {
-      messageMap[message['id']] = message;
-    }
-
-    // Convert to sorted list
-    return messageMap.values.toList()
-      ..sort((a, b) =>
-          (b['createdAt'] as Timestamp).compareTo(a['createdAt'] as Timestamp));
-  }
-
-  Future<void> _loadMoreMessages() async {
-    if (!_hasMoreMessages) return;
-
-    try {
-      final query = FirebaseFirestore.instance
-          .collection('chat/${widget.chatRoomId}/messages')
-          .orderBy('createdAt', descending: true)
-          .startAfter([_lastDocument?['createdAt']]).limit(_messagesPerPage);
-
-      final snapshot = await query.get();
-
-      if (snapshot.docs.isEmpty) {
-        setState(() {
-          _hasMoreMessages = false;
-        });
-        return;
-      }
-
-      final newMessages = snapshot.docs.map((doc) {
-        return {
-          'id': doc.id,
-          'senderId': doc['senderId'],
-          'text': doc['text'],
-          'createdAt': doc['createdAt'] ?? Timestamp.now(),
-        };
-      }).toList();
-
-      // Batch cache new messages
-      await _cacheManager.batchCacheMessages(newMessages, widget.chatRoomId);
-
-      // Update messages
-      final currentMessages = _messagesController.value;
-      final mergedMessages = _mergeMessages(currentMessages, newMessages);
-
-      _messagesController.add(mergedMessages);
-
-      // Update last document for pagination
-      _lastDocument = snapshot.docs.last;
-    } catch (e) {
-      print("Error loading more messages: $e");
-    }
-  }
-
   void _sendMessage() async {
     final messageText = _messageController.text.trim();
-    _messageController.clear();
     if (messageText.isEmpty) return;
 
     try {
@@ -229,6 +94,7 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           'id': newMessage.id,
           'senderId': widget.currentUserId,
           'text': messageText,
+          'chatRoomId': widget.chatRoomId,
           'createdAt': Timestamp.now(),
           'isSeen': false
         },
@@ -253,6 +119,25 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
+  void _markMessagesAsSeen() async {
+    try {
+      final unreadMessages = await FirebaseFirestore.instance
+          .collection('chat/${widget.chatRoomId}/messages')
+          .where('senderId', isNotEqualTo: widget.currentUserId)
+          .where('isSeen', isEqualTo: false)
+          .get();
+
+      // Batch update to mark messages as seen
+      final batch = FirebaseFirestore.instance.batch();
+      for (var doc in unreadMessages.docs) {
+        batch.update(doc.reference, {'isSeen': true});
+      }
+      await batch.commit();
+    } catch (e) {
+      print("Error marking messages as seen: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -260,14 +145,10 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         title: Row(
           children: [
             userDetails?['userimage'] != null
-                ? ClipOval(
-                    child: OptimizedNetworkImage(
-                      imageUrl: userDetails!['userimage'],
-                      width: 40,
-                      height: 40,
-                      fit: BoxFit
-                          .cover, // Ensures the image fits the circular shape properly
-                    ),
+                ? OptimizedNetworkImage(
+                    imageUrl: userDetails!['userimage'],
+                    width: 40,
+                    height: 40,
                   )
                 : const CircleAvatar(child: Icon(Icons.person)),
             const SizedBox(width: 10),
@@ -291,31 +172,63 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           ? const Center(child: LoadingAnimation())
           : Column(
               children: [
+                // Messages List
                 Expanded(
-                  child: StreamBuilder<List<Map<String, dynamic>>>(
-                    stream: _messagesController.stream,
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('chat/${widget.chatRoomId}/messages')
+                        .orderBy('createdAt', descending: true)
+                        .snapshots(),
                     builder: (context, snapshot) {
-                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      if (!snapshot.hasData) {
+                        return const Center(
+                          child: LoadingAnimation(),
+                        );
+                      }
+
+                      final messages = snapshot.data!.docs;
+
+                      // Automatically mark messages as seen when viewed
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _markMessagesAsSeen();
+                      });
+
+                      if (messages.isEmpty && _cachedMessages.isEmpty) {
                         return const Center(
                           child:
                               Text('No messages yet. Start the conversation!'),
                         );
                       }
 
-                      final messages = snapshot.data!;
+                      // Combine cached and live messages, removing duplicates
+                      final combinedMessagesMap =
+                          <String, Map<String, dynamic>>{};
+
+                      for (var cachedMessage in _cachedMessages) {
+                        combinedMessagesMap[cachedMessage['id']] =
+                            cachedMessage;
+                      }
+
+                      for (var liveMessage in messages) {
+                        combinedMessagesMap[liveMessage.id] = {
+                          'id': liveMessage.id,
+                          'senderId': liveMessage['senderId'],
+                          'text': liveMessage['text'],
+                          'createdAt':
+                              liveMessage['createdAt'] ?? Timestamp.now(),
+                        };
+                      }
+
+                      final combinedMessages = combinedMessagesMap.values
+                          .toList()
+                        ..sort((a, b) => (b['createdAt'] as Timestamp)
+                            .compareTo(a['createdAt'] as Timestamp));
 
                       return ListView.builder(
-                        controller: _scrollController,
                         reverse: true,
-                        itemCount: messages.length + (_hasMoreMessages ? 1 : 0),
+                        itemCount: combinedMessages.length,
                         itemBuilder: (context, index) {
-                          if (index == messages.length && _hasMoreMessages) {
-                            return const Center(
-                              child: LoadingAnimation(),
-                            );
-                          }
-
-                          final message = messages[index];
+                          final message = combinedMessages[index];
                           final isMine =
                               message['senderId'] == widget.currentUserId;
 
@@ -375,9 +288,6 @@ class MessageBubble extends StatelessWidget {
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.8,
-        ),
         padding: const EdgeInsets.all(10),
         margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
         decoration: BoxDecoration(

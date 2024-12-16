@@ -11,20 +11,28 @@ class PostCompleteScreen extends StatefulWidget {
   });
 
   @override
-  // ignore: library_private_types_in_public_api
-  _PostCompleteScreenState createState() => _PostCompleteScreenState();
+  PostCompleteScreenState createState() => PostCompleteScreenState();
 }
 
-class _PostCompleteScreenState extends State<PostCompleteScreen> {
+class PostCompleteScreenState extends State<PostCompleteScreen> {
   final TextEditingController tripBuddiesController = TextEditingController();
   final TextEditingController visitedPlacesController = TextEditingController();
 
   final List<String> tripBuddies = [];
+  final Map<String, Map<String, String>> userDetails = {};
   final List<String> visitedPlaces = [];
   String? tripFeedback;
   double? tripRating;
 
   bool visitedPlacesDisabled = false;
+
+  bool isLoading = false;
+
+  void _setLoading(bool loading) {
+    setState(() {
+      isLoading = loading;
+    });
+  }
 
   @override
   void dispose() {
@@ -33,18 +41,51 @@ class _PostCompleteScreenState extends State<PostCompleteScreen> {
     super.dispose();
   }
 
-  void _addTag(
-      String tag, TextEditingController controller, List<String> list) {
-    if (tag.isNotEmpty && !list.contains(tag)) {
-      setState(() {
-        list.add(tag);
-      });
-      controller.clear();
-    } else {
+  Future<void> _addTag(
+      String tag, TextEditingController controller, List<String> list) async {
+    if (tag.isEmpty || list.contains(tag)) {
       controller.clear();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Duplicate tag detected!")),
+        const SnackBar(content: Text("Duplicate or empty tag detected!")),
       );
+      return;
+    }
+
+    _setLoading(true); // Start loading
+    try {
+      // Check if the username exists in the 'user' collection
+      QuerySnapshot query = await FirebaseFirestore.instance
+          .collection('user')
+          .where('username', isEqualTo: tag)
+          .limit(1)
+          .get();
+
+      if (query.docs.isNotEmpty) {
+        // Username exists, add the tag and save the document ID
+        String userId = query.docs.first.id;
+        String fullName = query.docs.first['fullname'] ?? "Unknown Name";
+        String profileImage = query.docs.first['userimage'] ?? "";
+
+        setState(() {
+          list.add(tag);
+          userDetails[tag] = {
+            'userId': userId,
+            'fullname': fullName,
+            'userimage': profileImage,
+          };
+        });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Username does not exist")),
+          );
+        }
+      }
+    } catch (e) {
+      print(e);
+    } finally {
+      _setLoading(false); 
+      controller.clear();
     }
   }
 
@@ -59,6 +100,7 @@ class _PostCompleteScreenState extends State<PostCompleteScreen> {
   void _removeTag(String tag, List<String> list) {
     setState(() {
       list.remove(tag);
+      userDetails.remove(tag); // Also remove user info
     });
   }
 
@@ -72,6 +114,13 @@ class _PostCompleteScreenState extends State<PostCompleteScreen> {
 
   Future<void> _saveTripDetails() async {
     try {
+      List<String> tripBuddiesIds = tripBuddies
+          .map((username) {
+            return userDetails[username]?['userId'] ?? '';
+          })
+          .where((id) => id.isNotEmpty)
+          .toList();
+
       await FirebaseFirestore.instance
           .collection('post')
           .doc(widget.postId)
@@ -79,24 +128,51 @@ class _PostCompleteScreenState extends State<PostCompleteScreen> {
         'tripCompleted': true,
         'tripFeedback': tripFeedback,
         'tripRating': tripRating?.toInt(),
-        'tripBuddies': tripBuddies,
+        'tripBuddies': tripBuddiesIds, // Save only user IDs
         'visitedPlaces': visitedPlaces,
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Trip completed and data saved')),
-      );
-
-      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Trip completed and data saved')),
+        );
+        Navigator.pop(context);
+      }
     } catch (e) {
-      print('Error saving trip details: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to save trip details')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to save trip details')),
+        );
+      }
     }
   }
 
-  void _onComplete() {
+  Future<void> _onComplete() async {
+    final String remainingBuddyText = tripBuddiesController.text.trim();
+    final String remainingPlaceText = visitedPlacesController.text.trim();
+    if (remainingPlaceText.isNotEmpty) {
+      _addLocTag(remainingPlaceText, visitedPlacesController, visitedPlaces);
+    }
+
+    if (remainingBuddyText.isNotEmpty) {
+      await _addTag(remainingBuddyText, tripBuddiesController, tripBuddies);
+    }
+
+    // Validate that all buddies exist
+    final List<String> nonExistentBuddies = tripBuddies.where((buddy) {
+      return !userDetails.containsKey(buddy);
+    }).toList();
+
+    if (nonExistentBuddies.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Buddy not found: ${nonExistentBuddies.join(", ")}',
+          ),
+        ),
+      );
+      return;
+    }
     if (tripBuddies.isEmpty ||
         visitedPlaces.isEmpty ||
         tripFeedback == null ||
@@ -107,6 +183,35 @@ class _PostCompleteScreenState extends State<PostCompleteScreen> {
     } else {
       _saveTripDetails();
     }
+  }
+
+  void _addLocTag(
+      String tag, TextEditingController controller, List<String> list) {
+    if (tag.isNotEmpty && !list.contains(tag)) {
+      setState(() {
+        list.add(tag);
+      });
+      controller.clear();
+    } else {
+      controller.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Duplicate tag detected!")),
+      );
+    }
+  }
+
+  void _handleLocTagInput(
+      String value, TextEditingController controller, List<String> list) {
+    String tag = value.trim().replaceAll(',', '').replaceAll('\n', '').trim();
+    if (tag.isNotEmpty) {
+      _addLocTag(tag, controller, list);
+    }
+  }
+
+  void _removeLocTag(String tag, List<String> list) {
+    setState(() {
+      list.remove(tag);
+    });
   }
 
   @override
@@ -147,9 +252,51 @@ class _PostCompleteScreenState extends State<PostCompleteScreen> {
             ),
             Wrap(
               children: tripBuddies.map((tag) {
+                final userDetail = userDetails[tag];
+                final fullName = userDetail?['fullname'] ?? "Unknown";
+                final profileImage = userDetail?['userimage'] ?? "";
+
                 return Chip(
-                  label: Text(tag),
-                  deleteIcon: const Icon(Icons.close),
+                  labelPadding: const EdgeInsets.all(4.0),
+                  avatar: profileImage.isNotEmpty
+                      ? CircleAvatar(
+                          backgroundImage: NetworkImage(profileImage),
+                          radius: 12, // Small user image size
+                        )
+                      : const CircleAvatar(
+                          backgroundColor: Colors.grey,
+                          radius: 12, // Small default avatar size
+                          child: Icon(Icons.person, size: 14),
+                        ),
+                  label: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Username (with reduced text size)
+                      Flexible(
+                        child: Text(
+                          tag,
+                          style: const TextStyle(
+                              fontSize: 7,
+                              fontWeight:
+                                  FontWeight.bold), // Smaller font for username
+                          overflow: TextOverflow
+                              .ellipsis, // Ensure long text is truncated
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      // Full Name (smaller font size)
+                      Flexible(
+                        child: Text(
+                          fullName,
+                          style: const TextStyle(
+                              fontSize: 5,
+                              color: Colors.grey), // Smaller font for fullname
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  deleteIcon: const Icon(Icons.close, size: 16),
                   onDeleted: () => _removeTag(tag, tripBuddies),
                 );
               }).toList(),
@@ -164,14 +311,14 @@ class _PostCompleteScreenState extends State<PostCompleteScreen> {
               enabled: !visitedPlacesDisabled,
               onChanged: (value) {
                 if (value.endsWith(",") || value.endsWith("\n")) {
-                  _handleTagInput(
+                  _handleLocTagInput(
                       value, visitedPlacesController, visitedPlaces);
                   _checkVisitedPlacesLimit();
                 }
               },
               onSubmitted: (value) {
                 if (!visitedPlacesDisabled) {
-                  _handleTagInput(
+                  _handleLocTagInput(
                       value, visitedPlacesController, visitedPlaces);
                   _checkVisitedPlacesLimit();
                 }
@@ -182,7 +329,7 @@ class _PostCompleteScreenState extends State<PostCompleteScreen> {
                 return Chip(
                   label: Text(tag),
                   deleteIcon: const Icon(Icons.close),
-                  onDeleted: () => _removeTag(tag, visitedPlaces),
+                  onDeleted: () => _removeLocTag(tag, visitedPlaces),
                 );
               }).toList(),
             ),
@@ -195,7 +342,7 @@ class _PostCompleteScreenState extends State<PostCompleteScreen> {
 
             // Complete Button
             ElevatedButton(
-              onPressed: _onComplete,
+              onPressed: isLoading ? null : _onComplete,
               style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
               child: const Text('Complete'),
             ),

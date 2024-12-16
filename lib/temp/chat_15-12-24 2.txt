@@ -1,0 +1,400 @@
+//chating_screen.dart
+
+
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../../utils/loading.dart';
+
+class ChatScreen extends StatefulWidget {
+  final String currentUserId;
+  final String chatUserId;
+
+  const ChatScreen({
+    required this.currentUserId,
+    required this.chatUserId,
+    super.key,
+  });
+
+  @override
+  ChatScreenState createState() => ChatScreenState();
+}
+
+class ChatScreenState extends State<ChatScreen> {
+  final TextEditingController _messageController = TextEditingController();
+  late String chatRoomId;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeChatRoom();
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initializeChatRoom() async {
+    try {
+      chatRoomId = await _getOrCreateChatRoomId();
+    } catch (e) {
+      print("Error initializing chat room: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to initialize chat room")),
+      );
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<String> _getOrCreateChatRoomId() async {
+    final chatRooms = FirebaseFirestore.instance.collection('chat');
+
+    try {
+      final chatQuery = await chatRooms
+          .where('user', arrayContains: widget.currentUserId)
+          .get();
+
+      for (var chatDoc in chatQuery.docs) {
+        if ((chatDoc['user'] as List).contains(widget.chatUserId)) {
+          return chatDoc.id;
+        }
+      }
+      final newChatRoom = await chatRooms.add({
+        'user': [widget.currentUserId, widget.chatUserId],
+        'createdAt': FieldValue.serverTimestamp(),
+        'latestMessage': '',
+      });
+      return newChatRoom.id;
+    } catch (e) {
+      print("Error creating/fetching chat room: $e");
+      rethrow;
+    }
+  }
+
+  void _sendMessage() async {
+    final messageText = _messageController.text.trim();
+    if (messageText.isEmpty) return;
+
+    try {
+      final messageRef =
+          FirebaseFirestore.instance.collection('chat/$chatRoomId/messages');
+
+      await messageRef.add({
+        'senderId': widget.currentUserId,
+        'text': messageText,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      await FirebaseFirestore.instance
+          .collection('chat')
+          .doc(chatRoomId)
+          .update({'latestMessage': messageText});
+
+      _messageController.clear();
+    } catch (e) {
+      print("Error sending message: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to send message")),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Chat'),
+      ),
+      body: isLoading
+          ? const Center(child: LoadingAnimation())
+          : Column(
+              children: [
+                // Messages List
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('chat/$chatRoomId/messages')
+                        .orderBy('createdAt', descending: true)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Center(
+                          child: LoadingAnimation(),
+                        );
+                      }
+
+                      final messages = snapshot.data!.docs;
+                      if (messages.isEmpty) {
+                        return const Center(
+                          child:
+                              Text('No messages yet. Start the conversation!'),
+                        );
+                      }
+
+                      return ListView.builder(
+                        reverse: true,
+                        itemCount: messages.length,
+                        itemBuilder: (context, index) {
+                          final message = messages[index];
+                          final isMine =
+                              message['senderId'] == widget.currentUserId;
+
+                          return MessageBubble(
+                            message: message['text'],
+                            isMine: isMine,
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+                // Message Input
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _messageController,
+                          decoration: InputDecoration(
+                            hintText: 'Type a message',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.send),
+                        onPressed: _sendMessage,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class MessageBubble extends StatelessWidget {
+  final String message;
+  final bool isMine;
+
+  const MessageBubble({
+    required this.message,
+    required this.isMine,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+        decoration: BoxDecoration(
+          color: isMine ? Colors.blue : Colors.grey[300],
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          message,
+          style: TextStyle(
+            color: isMine ? Colors.white : Colors.black,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//chat_screen.dart
+
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../utils/loading.dart';
+import 'chating_screen.dart';
+
+class ChatHomeScreen extends StatefulWidget {
+  const ChatHomeScreen({super.key});
+
+  @override
+  ChatHomeScreenState createState() => ChatHomeScreenState();
+}
+
+class ChatHomeScreenState extends State<ChatHomeScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  final String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  List<Map<String, dynamic>> previousChats = [];
+  bool isLoading = true;
+  String? errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreviousChats();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPreviousChats() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    try {
+      final chatSnapshots = await FirebaseFirestore.instance
+          .collection('chat')
+          .where('user', arrayContains: currentUserId)
+          .get();
+
+      final userFutures = chatSnapshots.docs.map((chatDoc) async {
+        final chatData = chatDoc.data();
+        final userIds = chatData['user'] as List<dynamic>? ?? [];
+        final otherUserId = userIds.firstWhere(
+          (id) => id != currentUserId,
+          orElse: () => null,
+        );
+
+        if (otherUserId == null) return null;
+
+        final userSnapshot = await FirebaseFirestore.instance
+            .collection('user')
+            .doc(otherUserId)
+            .get();
+
+        if (userSnapshot.exists) {
+          final userData = userSnapshot.data();
+          return {
+            'userId': otherUserId,
+            'username': userData?['username'] ?? 'Unknown User',
+            'userimage':
+                userData?['userimage'] ?? 'https://via.placeholder.com/150',
+            'latestMessage': chatData['latestMessage'] ?? 'No messages yet',
+          };
+        }
+        return null;
+      });
+
+      final chatList = await Future.wait(userFutures);
+      setState(() {
+        previousChats = chatList.whereType<Map<String, dynamic>>().toList();
+        isLoading = false;
+      });
+    } catch (error) {
+      setState(() {
+        isLoading = false;
+        errorMessage = "Error loading chats. Please try again.";
+      });
+      debugPrint("Error loading chats: $error");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final searchQuery = _searchController.text.toLowerCase();
+    final filteredChats = previousChats.where((chat) {
+      return chat['username'].toLowerCase().contains(searchQuery);
+    }).toList();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Chats'),
+      ),
+      body: isLoading
+          ? const Center(child: LoadingAnimation())
+          : errorMessage != null
+              ? Center(child: Text(errorMessage!))
+              : Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: const InputDecoration(
+                          hintText: 'Search',
+                          prefixIcon: Icon(Icons.search),
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (value) => setState(() {}),
+                      ),
+                    ),
+                    Expanded(
+                      child: filteredChats.isEmpty
+                          ? Center(
+                              child: Text(
+                                _searchController.text.isEmpty
+                                    ? 'No chats found.'
+                                    : 'No chats matching "${_searchController.text}".',
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: filteredChats.length,
+                              itemBuilder: (context, index) {
+                                final chat = filteredChats[index];
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundImage:
+                                        NetworkImage(chat['userimage']),
+                                  ),
+                                  title: Text(chat['username']),
+                                  subtitle: Text(
+                                    chat['latestMessage'],
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ChatScreen(
+                                        currentUserId: currentUserId,
+                                        chatUserId: chat['userId'],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+    );
+  }
+}

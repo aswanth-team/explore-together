@@ -1,183 +1,259 @@
+import 'package:explore_together/utils/loading.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../../../utils/app_colors.dart';
 
-import '../../../data/users.dart';
-import '../../../data/removedusers.dart';
+class AnalysisPage extends StatefulWidget {
+  const AnalysisPage({super.key});
 
-class AnalysisPage extends StatelessWidget {
+  @override
+  State<AnalysisPage> createState() => AnalysisPageState();
+}
+
+class AnalysisPageState extends State<AnalysisPage> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   @override
   Widget build(BuildContext context) {
-    int totalActiveUsers = users.length;
-    int totalRemovedUsers = removedusers.length;
-
-    int totalUser = totalActiveUsers + totalRemovedUsers;
-    int maleCount = users.where((user) => user['userGender'] == 'Male').length;
-    int femaleCount =
-        users.where((user) => user['userGender'] == 'Female').length;
-    int otherCount =
-        users.where((user) => user['userGender'] == 'Other').length;
-
-    int totalPosts = users
-        .map((user) => (user['userPosts'] as List).length)
-        .reduce((a, b) => a + b);
-    int completedPosts = users
-        .map((user) => (user['userPosts'] as List)
-            .where((post) => post['tripCompleted'] == true)
-            .length)
-        .reduce((a, b) => a + b);
-
-    int incompletedPosts = totalPosts - completedPosts;
-
     return Scaffold(
       appBar: AppBar(
-        title: Text("Analysis"),
+        title: const Text("Analysis"),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Total Users Text
-              Center(
-                child: Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment.center, // Centers content horizontally
-                  crossAxisAlignment:
-                      CrossAxisAlignment.center, // Centers content vertically
-                  children: [
-                    Column(
-                      children: [
-                        Text(
-                          "$totalUser",
-                          style: TextStyle(
-                              fontSize: 40, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          "Total Users",
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                    SizedBox(
-                        width: 50), // Adds space between left and right content
-                    Column(
-                      children: [
-                        Text(
-                          "$totalPosts",
-                          style: TextStyle(
-                              fontSize: 40, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          "Total Posts",
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  ],
+      body: FutureBuilder(
+        future: _fetchAnalysisData(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const LoadingAnimation();
+          } else if (snapshot.hasError) {
+            return Center(child: Text("Error: ${snapshot.error}"));
+          } else if (snapshot.hasData) {
+            final data = snapshot.data as Map<String, dynamic>;
+            return _buildAnalysisContent(context, data);
+          } else {
+            return const Center(child: Text("No data available."));
+          }
+        },
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>> _fetchAnalysisData() async {
+    final usersSnapshot = await _firestore.collection('user').get();
+    final postsSnapshot = await _firestore.collection('post').get();
+
+    // Fetch user statistics
+    final users = usersSnapshot.docs.map((doc) => doc.data()).toList();
+    final totalUsers = users.length;
+    final totalRemovedUsers =
+        users.where((user) => user['isRemoved'] == true).length;
+    final totalActiveUsers = totalUsers - totalRemovedUsers;
+
+    final maleCount = users
+        .where((user) =>
+            user['gender'].toLowerCase() == 'male' &&
+            user['isRemoved'] == false)
+        .length;
+    final femaleCount = users
+        .where((user) =>
+            user['gender'].toLowerCase() == 'female' &&
+            user['isRemoved'] == false)
+        .length;
+    final otherCount = users
+        .where((user) =>
+            user['gender'].toLowerCase() == 'other' &&
+            user['isRemoved'] == false)
+        .length;
+
+    final removedMaleCount = users
+        .where((user) =>
+            user['gender'].toLowerCase() == 'male' && user['isRemoved'] == true)
+        .length;
+    final removedFemaleCount = users
+        .where((user) =>
+            user['gender'].toLowerCase() == 'female' &&
+            user['isRemoved'] == true)
+        .length;
+    final removedOtherCount = users
+        .where((user) =>
+            user['gender'].toLowerCase() == 'other' &&
+            user['isRemoved'] == true)
+        .length;
+
+    // Fetch post statistics
+    final posts = postsSnapshot.docs.map((doc) => doc.data()).toList();
+    final totalPosts = posts.length;
+    final completedPosts =
+        posts.where((post) => post['tripCompleted'] == true).length;
+    final incompletedPosts = totalPosts - completedPosts;
+
+    return {
+      'totalUsers': totalUsers,
+      'totalRemovedUsers': totalRemovedUsers,
+      'totalActiveUsers': totalActiveUsers,
+      'maleCount': maleCount,
+      'femaleCount': femaleCount,
+      'otherCount': otherCount,
+      'totalPosts': totalPosts,
+      'completedPosts': completedPosts,
+      'incompletedPosts': incompletedPosts,
+      'removedMaleCount': removedMaleCount,
+      'removedFemaleCount': removedFemaleCount,
+      'removedOtherCount': removedOtherCount,
+    };
+  }
+
+  Widget _buildAnalysisContent(
+      BuildContext context, Map<String, dynamic> data) {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  _buildStatColumn(data['totalUsers'], "Total Users"),
+                  // const SizedBox(width: 50),
+                  //_buildStatColumn(data['totalPosts'], "Total Posts"),
+                ],
+              ),
+            ),
+            const Divider(color: Colors.grey, thickness: 1, height: 20),
+            const SizedBox(height: 30),
+            // Removed Users Pie Chart
+            _buildPieChartWithHeading(
+              context,
+              'Users Status',
+              [
+                PieChartSectionData(
+                  value: data['totalRemovedUsers'].toDouble(),
+                  color: Colors.red,
+                  title: ' ',
+                  radius: 50,
                 ),
-              ),
+                PieChartSectionData(
+                  value: data['totalActiveUsers'].toDouble(),
+                  color: Colors.green,
+                  title: ' ',
+                  radius: 50,
+                ),
+              ],
+              [
+                "Active : ${data['totalActiveUsers']}",
+                "Removed : ${data['totalRemovedUsers']}"
+              ],
+            ),
 
-              Divider(
-                color: Colors.grey,
-                thickness: 1,
-                height: 20,
-              ),
-              SizedBox(height: 30),
+            // Gender Distribution Pie Chart
+            _buildPieChartWithHeading(
+              context,
+              'Gender Status',
+              [
+                PieChartSectionData(
+                  value: data['maleCount'].toDouble(),
+                  color: Colors.lightBlue,
+                  title: ' ',
+                  radius: 50,
+                ),
+                PieChartSectionData(
+                  value: data['femaleCount'].toDouble(),
+                  color: Colors.pink,
+                  title: ' ',
+                  radius: 50,
+                ),
+                PieChartSectionData(
+                  value: data['otherCount'].toDouble(),
+                  color: Colors.yellow,
+                  title: ' ',
+                  radius: 50,
+                ),
+              ],
+              [
+                "Male: ${data['maleCount']}",
+                "Female: ${data['femaleCount']}",
+                "Other: ${data['otherCount']}"
+              ],
+            ),
 
-              _buildPieChartWithHeading(
-                context,
-                'Removed Users',
-                [
-                  PieChartSectionData(
-                    value: totalRemovedUsers.toDouble(),
-                    title: ' ',
-                    color: const Color.fromARGB(255, 255, 0, 0),
-                    radius: 60,
-                  ),
-                  PieChartSectionData(
-                    value: totalActiveUsers.toDouble(),
-                    color: const Color.fromARGB(255, 108, 192, 11),
-                    title: ' ',
-                    radius: 60,
-                  ),
-                ],
-                [
-                  "Active Users: $totalActiveUsers",
-                  "Removed Users: $totalRemovedUsers"
-                ],
-              ),
+            _buildPieChartWithHeading(
+              context,
+              'Removed Gender Status',
+              [
+                PieChartSectionData(
+                  value: data['removedMaleCount'].toDouble(),
+                  color: Colors.lightBlue,
+                  title: ' ',
+                  radius: 50,
+                ),
+                PieChartSectionData(
+                  value: data['removedFemaleCount'].toDouble(),
+                  color: Colors.pink,
+                  title: ' ',
+                  radius: 50,
+                ),
+                PieChartSectionData(
+                  value: data['removedOtherCount'].toDouble(),
+                  color: Colors.yellow,
+                  title: ' ',
+                  radius: 50,
+                ),
+              ],
+              [
+                "Male: ${data['removedMaleCount']}",
+                "Female: ${data['removedFemaleCount']}",
+                "Other: ${data['removedOtherCount']}"
+              ],
+            ),
 
-              // Gender Distribution Pie Chart with Heading and Legend
-              _buildPieChartWithHeading(
-                context,
-                'Gender Status',
-                [
-                  PieChartSectionData(
-                    value: maleCount.toDouble(),
-                    color: const Color.fromARGB(255, 0, 174, 255),
-                    title: ' ',
-                    radius: 80,
-                  ),
-                  PieChartSectionData(
-                    value: femaleCount.toDouble(),
-                    color: const Color.fromARGB(255, 255, 0, 170),
-                    title: ' ',
-                    radius: 80,
-                  ),
-                  PieChartSectionData(
-                    value: otherCount.toDouble(),
-                    color: const Color.fromARGB(218, 255, 238, 0),
-                    title: ' ',
-                    radius: 80,
-                  ),
-                ],
-                [
-                  "Male: $maleCount",
-                  "Female: $femaleCount",
-                  "Other: $otherCount"
-                ],
-              ),
-
-              // Post Completion Pie Chart with Heading and Legend
-              _buildPieChartWithHeading(
-                context,
-                'Post Completion Status',
-                [
-                  PieChartSectionData(
-                    value: completedPosts.toDouble(),
-                    color: const Color.fromARGB(255, 108, 192, 11),
-                    title: ' ',
-                    radius: 80,
-                  ),
-                  PieChartSectionData(
-                    value: incompletedPosts.toDouble(),
-                    title: ' ',
-                    color: const Color.fromARGB(255, 211, 211, 211),
-                    radius: 80,
-                  ),
-                ],
-                [
-                  "Completed: $completedPosts",
-                  "Incompleted: $incompletedPosts"
-                ],
-              ),
-
-              // Removed Users Pie Chart with Heading and Legend
-            ],
-          ),
+            // Post Completion Pie Chart
+            _buildPieChartWithHeading(
+              context,
+              'Post Completion Status',
+              [
+                PieChartSectionData(
+                  value: data['completedPosts'].toDouble(),
+                  color: Colors.green,
+                  title: ' ',
+                  radius: 50,
+                ),
+                PieChartSectionData(
+                  value: data['incompletedPosts'].toDouble(),
+                  color: Colors.grey,
+                  title: ' ',
+                  radius: 50,
+                ),
+              ],
+              [
+                "Completed: ${data['completedPosts']}",
+                "Incompleted: ${data['incompletedPosts']}"
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 
-  // Function to build pie chart with heading, legend, and HR line
+  Widget _buildStatColumn(int count, String label) {
+    return Column(
+      children: [
+        Text(
+          "$count",
+          style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+              fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey),
+        ),
+      ],
+    );
+  }
+
   Widget _buildPieChartWithHeading(
     BuildContext context,
     String heading,
@@ -186,79 +262,67 @@ class AnalysisPage extends StatelessWidget {
   ) {
     return Column(
       children: [
-        // Heading for the chart
         Text(
           heading,
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isSmallScreen = constraints.maxWidth < 400;
 
-        // Pie Chart
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(
-              width: 200, // You can control the size of the PieChart here
-              height: 200,
-              child: PieChart(
-                PieChartData(
-                  sections: sections,
-                  sectionsSpace: 1,
-                  centerSpaceRadius: 0,
-                ),
-              ),
-            ),
-
-            // Legend on the right side of the PieChart
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: legends
-                  .map((legend) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10.0),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 15,
-                              height: 15,
-                              color: _getLegendColor(legend), // Color mapping
-                            ),
-                            SizedBox(width: 5),
-                            Text(legend),
-                          ],
+            return Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Container(
+                      width: isSmallScreen ? 150 : 200,
+                      height: isSmallScreen ? 150 : 200,
+                      child: PieChart(
+                        PieChartData(
+                          sections: sections,
+                          sectionsSpace: 1,
+                          centerSpaceRadius: 0,
                         ),
-                      ))
-                  .toList(),
-            ),
-          ],
+                      ),
+                    ),
+                    Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: legends
+                            .map((legend) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10.0),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 15,
+                                        height: 15,
+                                        color: AppColors.getLegendColor(legend),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Flexible(
+                                        child: Text(
+                                          legend,
+                                          style: const TextStyle(fontSize: 14),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ))
+                            .toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
         ),
-
-        // HR Line separator
-        Divider(
-          color: Colors.grey,
-          thickness: 1,
-          height: 20,
-        ),
+        const Divider(color: Colors.grey, thickness: 1, height: 20),
       ],
     );
-  }
-
-  // Function to map legend text to its corresponding color
-  Color _getLegendColor(String legend) {
-    if (legend.contains('Male')) {
-      return Colors.lightBlue;
-    } else if (legend.contains('Female')) {
-      return const Color.fromARGB(255, 255, 0, 170);
-    } else if (legend.contains('Other')) {
-      return const Color.fromARGB(218, 255, 238, 0);
-    } else if (legend.contains('Completed')) {
-      return const Color.fromARGB(255, 108, 192, 11); // Green for Completed
-    } else if (legend.contains('Incompleted')) {
-      return const Color.fromARGB(255, 211, 0, 0); // Red for Incompleted
-    } else if (legend.contains('Removed')) {
-      return const Color.fromARGB(255, 255, 0, 0);
-    } else {
-      return Colors.green; // Default color for unknown legends
-    }
   }
 }
