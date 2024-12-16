@@ -1,6 +1,11 @@
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:string_similarity/string_similarity.dart';
+
+// Import your existing utility and screen classes
 import '../../../utils/loading.dart';
 import '../userDetailsScreen/others_user_profile.dart';
 import '../userDetailsScreen/post&trip/post&trip/other_user_post_detail_screen.dart';
@@ -13,44 +18,109 @@ class HomePage extends StatefulWidget {
 }
 
 class HomePageState extends State<HomePage> {
+  // Controllers
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
+  // State variables
   String _searchQuery = "";
   List<String> suggestions = [];
   bool isSearchTriggered = false;
   bool isLoading = false;
   bool hasMorePosts = true;
+  bool isOffline = false;
 
+  // Posts and users storage
   List<DocumentSnapshot> posts = [];
   Map<String, Map<String, dynamic>> users = {};
 
+  // Pagination variables
   DocumentSnapshot? _lastDocument;
   final int _pageSize = 10;
 
   @override
   void initState() {
     super.initState();
-    fetchSuggestions();
+    _checkConnectivityAndLoadPosts();
     _scrollController.addListener(_onScroll);
-    _fetchInitialPosts();
+  }
+
+  Future<void> _checkConnectivityAndLoadPosts() async {
+    var connectivityResult = await (Connectivity().checkConnectivity());
+
+    if (connectivityResult == ConnectivityResult.none) {
+      // Offline mode
+      await _loadCachedPosts();
+      setState(() {
+        isOffline = true;
+      });
+    } else {
+      // Online mode
+      setState(() {
+        isOffline = false;
+      });
+      await fetchSuggestions();
+      await _fetchInitialPosts();
+    }
+  }
+
+  Future<void> _loadCachedPosts() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Load cached posts
+    final cachedPostsJson = prefs.getString('cached_posts') ?? '[]';
+    final cachedUsersJson = prefs.getString('cached_users') ?? '{}';
+
+    try {
+      final List<dynamic> cachedPostsList = json.decode(cachedPostsJson);
+      final Map<String, dynamic> cachedUsersMap = json.decode(cachedUsersJson);
+
+      setState(() {
+        // Convert cached data to required types
+        posts = cachedPostsList.map((postJson) {
+          return DocumentSnapshot.fromMap(
+              postJson, FirebaseFirestore.instance.collection('post').doc());
+        }).toList();
+
+        users = cachedUsersMap.map(
+            (key, value) => MapEntry(key, Map<String, dynamic>.from(value)));
+      });
+    } catch (e) {
+      print('Error loading cached posts: $e');
+    }
+  }
+
+  Future<void> _cachePosts() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Cache posts
+    final postsToCache = posts.map((post) => post.data()).toList();
+    await prefs.setString('cached_posts', json.encode(postsToCache));
+
+    // Cache users
+    await prefs.setString('cached_users', json.encode(users));
   }
 
   Future<void> fetchSuggestions() async {
-    final querySnapshot =
-        await FirebaseFirestore.instance.collection('post').get();
+    try {
+      final querySnapshot =
+          await FirebaseFirestore.instance.collection('post').get();
 
-    final suggestionSet = <String>{};
-    for (var doc in querySnapshot.docs) {
-      final data = doc.data();
-      suggestionSet.add(data['locationName']);
-      suggestionSet.addAll(List<String>.from(data['visitedPlaces'] ?? []));
-      suggestionSet.addAll(List<String>.from(data['planToVisitPlaces'] ?? []));
+      final suggestionSet = <String>{};
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data();
+        suggestionSet.add(data['locationName']);
+        suggestionSet.addAll(List<String>.from(data['visitedPlaces'] ?? []));
+        suggestionSet
+            .addAll(List<String>.from(data['planToVisitPlaces'] ?? []));
+      }
+
+      setState(() {
+        suggestions = suggestionSet.toList();
+      });
+    } catch (e) {
+      print('Error fetching suggestions: $e');
     }
-
-    setState(() {
-      suggestions = suggestionSet.toList();
-    });
   }
 
   Future<void> _fetchInitialPosts() async {
@@ -84,6 +154,9 @@ class HomePageState extends State<HomePage> {
         posts = randomQuery.docs;
         isLoading = false;
       });
+
+      // Cache the fetched posts
+      await _cachePosts();
     } catch (e) {
       print('Error fetching initial posts: $e');
       setState(() {
@@ -137,6 +210,9 @@ class HomePageState extends State<HomePage> {
         posts.addAll(querySnapshot.docs);
         isLoading = false;
       });
+
+      // Cache updated posts
+      await _cachePosts();
     } catch (e) {
       print('Error fetching more posts: $e');
       setState(() {
@@ -227,6 +303,9 @@ class HomePageState extends State<HomePage> {
         posts = filteredPosts;
         isLoading = false;
       });
+
+      // Cache search results
+      await _cachePosts();
     } catch (e) {
       print('Error searching posts: $e');
       setState(() {
@@ -293,6 +372,15 @@ class HomePageState extends State<HomePage> {
       ),
       body: Column(
         children: [
+          if (isOffline)
+            Container(
+              color: Colors.red,
+              padding: EdgeInsets.all(8),
+              child: Text(
+                'Offline Mode: Showing Cached Posts',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
           if (_searchQuery.isNotEmpty && !isSearchTriggered)
             Expanded(
               child: ListView.builder(
@@ -423,4 +511,340 @@ class HomePageState extends State<HomePage> {
       ),
     );
   }
+}
+
+
+
+import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:string_similarity/string_similarity.dart';
+
+// Import your existing utility and screen classes
+import '../../../utils/loading.dart';
+import '../userDetailsScreen/others_user_profile.dart';
+import '../userDetailsScreen/post&trip/post&trip/other_user_post_detail_screen.dart';
+
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  HomePageState createState() => HomePageState();
+}
+
+class HomePageState extends State<HomePage> {
+  // Controllers
+  final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
+  // State variables
+  String _searchQuery = "";
+  List<String> suggestions = [];
+  bool isSearchTriggered = false;
+  bool isLoading = false;
+  bool hasMorePosts = true;
+  bool isOffline = false;
+
+  // Posts and users storage
+  List<Map<String, dynamic>> posts = [];
+  Map<String, Map<String, dynamic>> users = {};
+
+  // Pagination variables
+  Map<String, dynamic>? _lastDocument;
+  final int _pageSize = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkConnectivityAndLoadPosts();
+    _scrollController.addListener(_onScroll);
+  }
+
+  Future<void> _checkConnectivityAndLoadPosts() async {
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    
+    if (connectivityResult == ConnectivityResult.none) {
+      // Offline mode
+      await _loadCachedPosts();
+      setState(() {
+        isOffline = true;
+      });
+    } else {
+      // Online mode
+      setState(() {
+        isOffline = false;
+      });
+      await fetchSuggestions();
+      await _fetchInitialPosts();
+    }
+  }
+
+  Future<void> _loadCachedPosts() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Load cached posts
+    final cachedPostsJson = prefs.getString('cached_posts') ?? '[]';
+    final cachedUsersJson = prefs.getString('cached_users') ?? '{}';
+
+    try {
+      final List<dynamic> cachedPostsList = json.decode(cachedPostsJson);
+      final Map<String, dynamic> cachedUsersMap = json.decode(cachedUsersJson);
+
+      setState(() {
+        // Convert cached data to required types
+        posts = cachedPostsList.map((postJson) => 
+          Map<String, dynamic>.from(postJson)
+        ).toList();
+
+        users = cachedUsersMap.map((key, value) => 
+          MapEntry(key, Map<String, dynamic>.from(value))
+        );
+      });
+    } catch (e) {
+      print('Error loading cached posts: $e');
+    }
+  }
+
+  Future<void> _cachePosts() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Cache posts
+    await prefs.setString('cached_posts', json.encode(posts));
+    
+    // Cache users
+    await prefs.setString('cached_users', json.encode(users));
+  }
+
+  Future<void> fetchSuggestions() async {
+    try {
+      final querySnapshot =
+          await FirebaseFirestore.instance.collection('post').get();
+
+      final suggestionSet = <String>{};
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data();
+        suggestionSet.add(data['locationName']);
+        suggestionSet.addAll(List<String>.from(data['visitedPlaces'] ?? []));
+        suggestionSet.addAll(List<String>.from(data['planToVisitPlaces'] ?? []));
+      }
+
+      setState(() {
+        suggestions = suggestionSet.toList();
+      });
+    } catch (e) {
+      print('Error fetching suggestions: $e');
+    }
+  }
+
+  Future<void> _fetchInitialPosts() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Fetch 10 random posts
+      final randomQuery = await FirebaseFirestore.instance
+          .collection('post')
+          .orderBy(FieldPath.documentId)
+          .limit(_pageSize)
+          .get();
+
+      if (randomQuery.docs.isEmpty) {
+        setState(() {
+          hasMorePosts = false;
+          isLoading = false;
+        });
+        return;
+      }
+
+      // Store the last document for pagination
+      _lastDocument = randomQuery.docs.last.data();
+
+      // Fetch users for these posts
+      await _fetchUsersForPosts(randomQuery.docs);
+
+      setState(() {
+        posts = randomQuery.docs.map((doc) {
+          var data = doc.data();
+          data['id'] = doc.id; // Store document ID
+          return data;
+        }).toList();
+        isLoading = false;
+      });
+
+      // Cache the fetched posts
+      await _cachePosts();
+    } catch (e) {
+      print('Error fetching initial posts: $e');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchMorePosts() async {
+    if (!hasMorePosts || isLoading) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      Query query;
+      if (_searchQuery.isNotEmpty) {
+        // Search-based query
+        query = FirebaseFirestore.instance
+            .collection('post')
+            .where('locationName',
+                isGreaterThan: _lastDocument?['locationName'])
+            .limit(_pageSize);
+      } else {
+        // Random posts query
+        query = FirebaseFirestore.instance
+            .collection('post')
+            .orderBy(FieldPath.documentId)
+            .startAfterDocument(
+              FirebaseFirestore.instance.collection('post').doc(_lastDocument?['id'])
+            )
+            .limit(_pageSize);
+      }
+
+      final querySnapshot = await query.get();
+
+      if (querySnapshot.docs.isEmpty) {
+        setState(() {
+          hasMorePosts = false;
+          isLoading = false;
+        });
+        return;
+      }
+
+      // Update last document for next pagination
+      _lastDocument = querySnapshot.docs.last.data();
+
+      // Fetch users for new posts
+      await _fetchUsersForPosts(querySnapshot.docs);
+
+      // Add new posts to existing posts
+      final newPosts = querySnapshot.docs.map((doc) {
+        var data = doc.data();
+        data['id'] = doc.id; // Store document ID
+        return data;
+      }).toList();
+
+      setState(() {
+        posts.addAll(newPosts);
+        isLoading = false;
+      });
+
+      // Cache updated posts
+      await _cachePosts();
+    } catch (e) {
+      print('Error fetching more posts: $e');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchUsersForPosts(List<DocumentSnapshot> newPosts) async {
+    final userIds = newPosts.map((post) => post['userid']).toSet();
+
+    if (userIds.isEmpty) return;
+
+    final userSnapshots = await FirebaseFirestore.instance
+        .collection('user')
+        .where(FieldPath.documentId, whereIn: userIds.toList())
+        .get();
+
+    final newUsers = {
+      for (var doc in userSnapshots.docs)
+        doc.id: doc.data() as Map<String, dynamic>
+    };
+
+    setState(() {
+      users.addAll(newUsers);
+    });
+  }
+
+  Future<void> _searchPosts() async {
+    setState(() {
+      isLoading = true;
+      posts.clear();
+      hasMorePosts = true;
+      _lastDocument = null;
+    });
+
+    try {
+      Query query =
+          FirebaseFirestore.instance.collection('post').limit(_pageSize);
+
+      final querySnapshot = await query.get();
+
+      if (querySnapshot.docs.isEmpty) {
+        setState(() {
+          hasMorePosts = false;
+          isLoading = false;
+        });
+        return;
+      }
+
+      // Filter posts based on search query
+      final filteredPosts = querySnapshot.docs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final locationName =
+            data['locationName']?.toString().toLowerCase() ?? "";
+        final visitedPlaces = List<String>.from(data['visitedPlaces'] ?? [])
+            .map((e) => e.toLowerCase())
+            .toList();
+        final planToVisitPlaces =
+            List<String>.from(data['planToVisitPlaces'] ?? [])
+                .map((e) => e.toLowerCase())
+                .toList();
+
+        final allSearchableFields = [
+          locationName,
+          ...visitedPlaces,
+          ...planToVisitPlaces
+        ];
+
+        return allSearchableFields.any(
+            (field) => field.similarityTo(_searchQuery.toLowerCase()) > 0.6);
+      }).toList();
+
+      if (filteredPosts.isEmpty) {
+        setState(() {
+          hasMorePosts = false;
+          isLoading = false;
+        });
+        return;
+      }
+
+      _lastDocument = filteredPosts.last.data();
+
+      // Fetch users for filtered posts
+      await _fetchUsersForPosts(filteredPosts);
+
+      setState(() {
+        posts = filteredPosts.map((doc) {
+          var data = doc.data();
+          data['id'] = doc.id; // Store document ID
+          return data;
+        }).toList();
+        isLoading = false;
+      });
+
+      // Cache search results
+      await _cachePosts();
+    } catch (e) {
+      print('Error searching posts: $e');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  // ... (rest of the code remains the same as in the previous implementation)
 }
