@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
-
 import '../../../services/cloudinary_upload.dart';
 import '../../../utils/loading.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final String uuid;
-  const EditProfileScreen({Key? key, required this.uuid}) : super(key: key);
+  const EditProfileScreen({super.key, required this.uuid});
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
 }

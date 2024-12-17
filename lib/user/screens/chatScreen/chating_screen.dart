@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:rxdart/rxdart.dart';
-import '../../../utils/loading.dart';
 import 'chat_utils.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -24,14 +23,14 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final TextEditingController _messageController = TextEditingController();
   final ChatCacheManager _cacheManager = ChatCacheManager();
   final BehaviorSubject<List<Map<String, dynamic>>> _messagesController =
-      BehaviorSubject<List<Map<String, dynamic>>>();
+      BehaviorSubject<List<Map<String, dynamic>>>.seeded([]);
 
   bool isLoading = true;
   bool isUserOnline = false;
   Map<String, dynamic>? userDetails;
 
   // Pagination variables
-  static const int _messagesPerPage = 50;
+  static const int _messagesPerPage = 20; // Fetch limited messages initially
   DocumentSnapshot? _lastDocument;
   bool _hasMoreMessages = true;
   final ScrollController _scrollController = ScrollController();
@@ -47,7 +46,8 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void _setupScrollListener() {
     _scrollController.addListener(() {
       if (_scrollController.position.pixels ==
-          _scrollController.position.maxScrollExtent) {
+          _scrollController.position.minScrollExtent) {
+        // Trigger loading older messages when scrolled to the top
         _loadMoreMessages();
       }
     });
@@ -64,10 +64,10 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   Future<void> _initializeChat() async {
     try {
-      // Initialize database
+      // Initialize the local database
       await _cacheManager.initDatabase();
 
-      // Fetch user details concurrently
+      // Fetch initial user details and cache messages concurrently
       final userFuture = FirebaseFirestore.instance
           .collection('user')
           .doc(widget.chatUserId)
@@ -76,17 +76,18 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final onlineStatusFuture =
           UserStatusManager.getUserOnlineStatus(widget.chatUserId);
 
-      // Load initial cached messages
-      final cachedMessagesFuture = _cacheManager
-          .getCachedMessages(widget.chatRoomId, limit: _messagesPerPage);
+      final cachedMessagesFuture = _cacheManager.getCachedMessages(
+        widget.chatRoomId,
+        limit: _messagesPerPage,
+      );
 
-      // Wait for all futures
-      final results = await Future.wait(
-          [userFuture, onlineStatusFuture, cachedMessagesFuture]);
+      final results = await Future.wait([
+        userFuture,
+        onlineStatusFuture,
+        cachedMessagesFuture,
+      ]);
 
-      // Update state
       setState(() {
-        // Use .data() method correctly
         userDetails =
             (results[0] as DocumentSnapshot).data() as Map<String, dynamic>?;
         isUserOnline = results[1] as bool;
@@ -94,7 +95,7 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         isLoading = false;
       });
 
-      // Start listening to new messages
+      // Start listening for new messages in real-time
       _setupMessageListener();
     } catch (e) {
       print("Error initializing chat: $e");
@@ -111,7 +112,6 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         .limit(_messagesPerPage)
         .snapshots()
         .listen((snapshot) {
-      // Update messages and cache simultaneously
       _updateMessagesWithSnapshot(snapshot);
     }, onError: (error) {
       print("Error listening to messages: $error");
@@ -120,7 +120,6 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   void _updateMessagesWithSnapshot(QuerySnapshot snapshot) async {
     try {
-      // Convert snapshot to messages
       final liveMessages = snapshot.docs.map((doc) {
         return {
           'id': doc.id,
@@ -130,10 +129,8 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         };
       }).toList();
 
-      // Batch cache new messages
       await _cacheManager.batchCacheMessages(liveMessages, widget.chatRoomId);
 
-      // Merge with existing messages
       final currentMessages = _messagesController.value;
       final mergedMessages = _mergeMessages(currentMessages, liveMessages);
 
@@ -141,27 +138,6 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     } catch (e) {
       print("Error updating messages: $e");
     }
-  }
-
-  List<Map<String, dynamic>> _mergeMessages(
-      List<Map<String, dynamic>> existingMessages,
-      List<Map<String, dynamic>> newMessages) {
-    final messageMap = <String, Map<String, dynamic>>{};
-
-    // Add existing messages
-    for (var message in existingMessages) {
-      messageMap[message['id']] = message;
-    }
-
-    // Add or update new messages
-    for (var message in newMessages) {
-      messageMap[message['id']] = message;
-    }
-
-    // Convert to sorted list
-    return messageMap.values.toList()
-      ..sort((a, b) =>
-          (b['createdAt'] as Timestamp).compareTo(a['createdAt'] as Timestamp));
   }
 
   Future<void> _loadMoreMessages() async {
@@ -191,20 +167,35 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         };
       }).toList();
 
-      // Batch cache new messages
       await _cacheManager.batchCacheMessages(newMessages, widget.chatRoomId);
 
-      // Update messages
       final currentMessages = _messagesController.value;
       final mergedMessages = _mergeMessages(currentMessages, newMessages);
 
       _messagesController.add(mergedMessages);
 
-      // Update last document for pagination
       _lastDocument = snapshot.docs.last;
     } catch (e) {
       print("Error loading more messages: $e");
     }
+  }
+
+  List<Map<String, dynamic>> _mergeMessages(
+      List<Map<String, dynamic>> existingMessages,
+      List<Map<String, dynamic>> newMessages) {
+    final messageMap = <String, Map<String, dynamic>>{};
+
+    for (var message in existingMessages) {
+      messageMap[message['id']] = message;
+    }
+
+    for (var message in newMessages) {
+      messageMap[message['id']] = message;
+    }
+
+    return messageMap.values.toList()
+      ..sort((a, b) =>
+          (b['createdAt'] as Timestamp).compareTo(a['createdAt'] as Timestamp));
   }
 
   void _sendMessage() async {
@@ -223,7 +214,6 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         'isSeen': false
       });
 
-      // Cache the message locally
       await _cacheManager.cacheMessage(
         {
           'id': newMessage.id,
@@ -235,7 +225,6 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         widget.chatRoomId,
       );
 
-      // Update latest message in chat room
       await FirebaseFirestore.instance
           .collection('chat')
           .doc(widget.chatRoomId)
@@ -265,8 +254,6 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       imageUrl: userDetails!['userimage'],
                       width: 40,
                       height: 40,
-                      fit: BoxFit
-                          .cover, // Ensures the image fits the circular shape properly
                     ),
                   )
                 : const CircleAvatar(child: Icon(Icons.person)),
@@ -274,7 +261,7 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(userDetails?['username'] ?? 'User'),
+                Text(userDetails?['username'] ?? 'Loading...'),
                 Text(
                   isUserOnline ? 'Online' : 'Offline',
                   style: TextStyle(
@@ -288,13 +275,16 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ),
       ),
       body: isLoading
-          ? const Center(child: LoadingAnimation())
+          ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
                 Expanded(
                   child: StreamBuilder<List<Map<String, dynamic>>>(
                     stream: _messagesController.stream,
                     builder: (context, snapshot) {
+                      if (isLoading) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
                       if (!snapshot.hasData || snapshot.data!.isEmpty) {
                         return const Center(
                           child:
@@ -303,53 +293,72 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       }
 
                       final messages = snapshot.data!;
-
                       return ListView.builder(
                         controller: _scrollController,
                         reverse: true,
                         itemCount: messages.length + (_hasMoreMessages ? 1 : 0),
                         itemBuilder: (context, index) {
-                          if (index == messages.length && _hasMoreMessages) {
+                          if (_hasMoreMessages && index == messages.length) {
                             return const Center(
-                              child: LoadingAnimation(),
+                              child: CircularProgressIndicator(),
                             );
                           }
 
                           final message = messages[index];
-                          final isMine =
-                              message['senderId'] == widget.currentUserId;
-
-                          return MessageBubble(
-                            message: message['text'],
-                            isMine: isMine,
+                          return ChatBubble(
+                            isSentByCurrentUser:
+                                message['senderId'] == widget.currentUserId,
+                            text: message['text'],
+                            createdAt: message['createdAt'],
                           );
                         },
                       );
                     },
                   ),
                 ),
-                // Message Input
+                const Divider(height: 1),
                 Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: Row(
                     children: [
                       Expanded(
-                        child: TextField(
-                          controller: _messageController,
-                          decoration: InputDecoration(
-                            hintText: 'Type a message',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: TextField(
+                            controller: _messageController,
+                            decoration: InputDecoration(
+                              hintText: 'Type a message...',
+                              hintStyle: TextStyle(color: Colors.grey[600]),
+                              filled: true,
+                              fillColor: Colors.grey[200],
+                              contentPadding: EdgeInsets.symmetric(
+                                  vertical: 16,
+                                  horizontal: 16), // Increased vertical padding
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(30),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(30),
+                                borderSide:
+                                    BorderSide(color: Colors.blueAccent),
+                              ),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 10),
+                            onSubmitted: (_) => _sendMessage(),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.send),
-                        onPressed: _sendMessage,
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.send,
+                            color: Colors.blueAccent,
+                          ),
+                          onPressed: _sendMessage,
+                          splashColor: Colors.blueAccent.withOpacity(0.3),
+                          splashRadius: 25,
+                        ),
                       ),
                     ],
                   ),
@@ -360,35 +369,65 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 }
 
-class MessageBubble extends StatelessWidget {
-  final String message;
-  final bool isMine;
+class ChatBubble extends StatelessWidget {
+  final bool isSentByCurrentUser;
+  final String text;
+  final dynamic createdAt; // Accept dynamic since it might be int or Timestamp
 
-  const MessageBubble({
-    required this.message,
-    required this.isMine,
+  const ChatBubble({
+    required this.isSentByCurrentUser,
+    required this.text,
+    required this.createdAt,
     Key? key,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    // Convert createdAt to DateTime safely
+    final time = TimeOfDay.fromDateTime(
+      createdAt is Timestamp
+          ? createdAt.toDate()
+          : DateTime.fromMillisecondsSinceEpoch(createdAt ?? 0),
+    );
+    final formattedTime =
+        "${time.hourOfPeriod}:${time.minute.toString().padLeft(2, '0')} ${time.period == DayPeriod.am ? 'AM' : 'PM'}";
+
     return Align(
-      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+      alignment:
+          isSentByCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.8,
-        ),
-        padding: const EdgeInsets.all(10),
         margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+        constraints: const BoxConstraints(maxWidth: 300),
         decoration: BoxDecoration(
-          color: isMine ? Colors.blue : Colors.grey[300],
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          message,
-          style: TextStyle(
-            color: isMine ? Colors.white : Colors.black,
+          color: isSentByCurrentUser ? Colors.blue : Colors.grey.shade300,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(12),
+            topRight: const Radius.circular(12),
+            bottomLeft: Radius.circular(isSentByCurrentUser ? 12 : 0),
+            bottomRight: Radius.circular(isSentByCurrentUser ? 0 : 12),
           ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              text,
+              style: TextStyle(
+                color: isSentByCurrentUser ? Colors.white : Colors.black,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              formattedTime,
+              style: TextStyle(
+                color: isSentByCurrentUser ? Colors.white70 : Colors.black54,
+                fontSize: 12,
+              ),
+            ),
+          ],
         ),
       ),
     );

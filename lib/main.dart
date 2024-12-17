@@ -5,12 +5,10 @@ import 'package:flutter/material.dart';
 import 'admin/screens/admin_screen.dart';
 import 'firebase_options.dart';
 import 'login_screen.dart';
-import 'user/screens/chatScreen/chat_utils.dart';
 import 'user/screens/user_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await ChatCacheManager.initialize();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

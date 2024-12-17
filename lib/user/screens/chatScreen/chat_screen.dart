@@ -1,6 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../utils/loading.dart';
 import 'chat_utils.dart';
 import 'chating_screen.dart';
@@ -45,17 +45,19 @@ class ChatHomeScreenState extends State<ChatHomeScreen>
     try {
       // Always load cached chats first
       final cachedChats = await PreferencesManager.loadChats();
+      setState(() {
+        previousChats = cachedChats;
+        isLoading = false;
+      });
+
+      // If offline, don't try to fetch data from Firestore
       if (cachedChats.isNotEmpty) {
         setState(() {
-          previousChats = cachedChats;
-          isLoading = false;
+          isOffline = true;
         });
+        return;
       }
-
-      // Try to fetch fresh data from Firestore
-      await _loadPreviousChats();
     } catch (error) {
-      // If there's an error, fall back to cached chats or show offline state
       setState(() {
         isLoading = false;
         isOffline = true;
@@ -63,80 +65,6 @@ class ChatHomeScreenState extends State<ChatHomeScreen>
             ? "No internet connection. No saved chats found."
             : "Offline mode: Showing saved chats";
       });
-    }
-  }
-
-  Future<void> _loadPreviousChats() async {
-    setState(() {
-      isLoading = true;
-      errorMessage = null;
-      isOffline = false;
-    });
-
-    try {
-      final chatSnapshots = await FirebaseFirestore.instance
-          .collection('chat')
-          .where('user', arrayContains: currentUserId)
-          .limit(20) // Limit initial load
-          .get();
-
-      final userFutures = chatSnapshots.docs.map((chatDoc) async {
-        final chatData = chatDoc.data();
-        final userIds = chatData['user'] as List<dynamic>? ?? [];
-        final otherUserId = userIds.firstWhere(
-          (id) => id != currentUserId,
-          orElse: () => null,
-        );
-
-        if (otherUserId == null) return null;
-
-        final userSnapshot = await FirebaseFirestore.instance
-            .collection('user')
-            .doc(otherUserId)
-            .get();
-
-        if (userSnapshot.exists) {
-          final userData = userSnapshot.data();
-
-          // Calculate unread messages from the opposite user
-          final unseenCount = await _cacheManager.getUnseenMessageCount(
-            chatDoc.id,
-            senderId: otherUserId,
-          );
-
-          return {
-            'userId': otherUserId,
-            'chatRoomId': chatDoc.id,
-            'username': userData?['username'] ?? 'Unknown User',
-            'userimage':
-                userData?['userimage'] ?? 'https://via.placeholder.com/150',
-            'latestMessage': chatData['latestMessage'] ?? 'No messages yet',
-            'unseenCount': unseenCount
-          };
-        }
-        return null;
-      });
-
-      final chatList = await Future.wait(userFutures);
-      final validChats = chatList.whereType<Map<String, dynamic>>().toList();
-
-      setState(() {
-        previousChats = validChats;
-        isLoading = false;
-      });
-
-      // Save to local storage
-      await PreferencesManager.saveChats(validChats);
-    } catch (error) {
-      // Handle offline scenario
-      setState(() {
-        isLoading = false;
-        isOffline = true;
-        errorMessage = previousChats.isEmpty
-            ? "Error loading chats. No internet connection."
-            : "Offline mode: Showing saved chats";
-      });
-      debugPrint("Error loading chats: $error");
     }
   }
 
@@ -155,23 +83,6 @@ class ChatHomeScreenState extends State<ChatHomeScreen>
           ? const Center(child: LoadingAnimation())
           : Column(
               children: [
-                if (isOffline)
-                  Container(
-                    color: Colors.yellow[200],
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.wifi_off),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            errorMessage ?? 'No internet connection',
-                            style: const TextStyle(color: Colors.black),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: TextField(
@@ -194,54 +105,32 @@ class ChatHomeScreenState extends State<ChatHomeScreen>
                             textAlign: TextAlign.center,
                           ),
                         )
-                      : GridView.builder(
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 1,
-                            childAspectRatio: 4.3,
-                          ),
+                      : ListView.builder(
                           itemCount: filteredChats.length,
                           itemBuilder: (context, index) {
                             final chat = filteredChats[index];
                             return Card(
+                              margin: EdgeInsets.symmetric(
+                                  vertical:
+                                      0.5), // Adjust card margin if necessary
                               child: ListTile(
+                                contentPadding: EdgeInsets.symmetric(
+                                    vertical: 20.0,
+                                    horizontal:
+                                        16.0), // Increase vertical padding to increase height
                                 leading: Stack(
                                   children: [
                                     ClipOval(
                                       child: OptimizedNetworkImage(
                                         imageUrl: chat['userimage'],
-                                        width: 50,
-                                        height: 50,
-                                        fit: BoxFit
-                                            .cover, // Ensures the image fits the circular shape properly
+                                        width: 60, // Increase image width
+                                        height: 60, // Increase image height
+                                        fit: BoxFit.cover,
                                       ),
                                     ),
-                                    if (chat['unseenCount'] > 0)
-                                      Positioned(
-                                        right: 0,
-                                        top: 0,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: const BoxDecoration(
-                                            color: Colors.red,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: Text(
-                                            '${chat['unseenCount']}',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
                                   ],
                                 ),
                                 title: Text(chat['username']),
-                                subtitle: Text(
-                                  chat['latestMessage'],
-                                  overflow: TextOverflow.ellipsis,
-                                ),
                                 onTap: () => Navigator.push(
                                   context,
                                   MaterialPageRoute(
