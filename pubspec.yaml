@@ -50,6 +50,9 @@ dependencies:
   connectivity_plus: ^6.1.1
   provider: ^6.1.2
   rxdart: ^0.28.0
+  fluttertoast: ^8.2.10
+  mockito: ^5.4.4
+  build_runner: 2.4.13
 
 
 dev_dependencies:

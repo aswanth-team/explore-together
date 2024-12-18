@@ -10,21 +10,23 @@ import '../../user_screen.dart';
 import 'post_complete_screen.dart';
 import 'post_image_swipe.dart';
 
-class PostDetailScreen extends StatefulWidget {
+class CurrentUserPostDetailScreen extends StatefulWidget {
   final String postId;
   final String userId;
 
-  const PostDetailScreen({
+  const CurrentUserPostDetailScreen({
     super.key,
     required this.postId,
     required this.userId,
   });
 
   @override
-  State<PostDetailScreen> createState() => _PostDetailScreenState();
+  State<CurrentUserPostDetailScreen> createState() =>
+      _CurrentUserPostDetailScreenState();
 }
 
-class _PostDetailScreenState extends State<PostDetailScreen> {
+class _CurrentUserPostDetailScreenState
+    extends State<CurrentUserPostDetailScreen> {
   final UserService _userService = UserService();
   final UserPostServices _userPostServices = UserPostServices();
   @override

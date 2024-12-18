@@ -1,10 +1,12 @@
 //inspect view of user profile
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../utils/app_colors.dart';
 import '../../../utils/loading.dart';
 import '../chatScreen/chating_screen.dart';
 import 'post&trip/post&trip/other_user_posts.dart';
@@ -23,16 +25,6 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
   int totalPosts = 0;
   int completedPosts = 0;
   String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
-
-  Color getBorderColor(String gender) {
-    if (gender.toLowerCase() == "male") {
-      return Colors.lightBlue;
-    } else if (gender.toLowerCase() == "female") {
-      return Colors.pinkAccent.shade100;
-    } else {
-      return Colors.yellow.shade600;
-    }
-  }
 
   Future<String> _getOrCreateChatRoom() async {
     try {
@@ -143,9 +135,9 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                                       child: Container(
                                         decoration: BoxDecoration(
                                           border: Border.all(
-                                            color: getBorderColor(profileData[
-                                                    'gender'] ??
-                                                ''), // Use gender to determine border color
+                                            color: AppColors.genderBorderColor(
+                                                profileData['gender'] ??
+                                                    ''), // Use gender to determine border color
                                             width: 1.0, // Set border width
                                           ),
                                           borderRadius: BorderRadius.circular(
@@ -154,9 +146,17 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                                         child: ClipRRect(
                                           borderRadius: BorderRadius.circular(
                                               8.0), // Match border radius
-                                          child: Image.network(
-                                            userImage, // URL of the image
-                                            fit: BoxFit.cover,
+                                          child: CachedNetworkImage(
+                                            imageUrl:
+                                                userImage, // URL of the image
+                                            placeholder: (context, url) =>
+                                                CircularProgressIndicator(), // Placeholder widget while loading
+                                            errorWidget: (context, url,
+                                                    error) =>
+                                                Icon(Icons
+                                                    .error), // Fallback error widget if loading fails
+                                            fit: BoxFit
+                                                .cover, // Adjust the image size to cover the available space
                                           ),
                                         ),
                                       ),
@@ -172,8 +172,9 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: getBorderColor(profileData['gender'] ??
-                                    ''), // Dynamically set border color
+                                color: AppColors.genderBorderColor(
+                                    profileData['gender'] ??
+                                        ''), // Dynamically set border color
                                 width: 2, // Border width
                               ),
                             ),

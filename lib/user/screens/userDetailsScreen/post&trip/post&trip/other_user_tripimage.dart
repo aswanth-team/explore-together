@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../../../../services/user/firebase_tripImages.dart';
 
@@ -16,6 +17,7 @@ class UserTripImagesWidget extends StatefulWidget {
 class UserTripImagesWidgetState extends State<UserTripImagesWidget> {
   List<String> tripImages = [];
 
+  @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<String>>(
       stream: UserTripImageServices().fetchUserTripImagesStream(widget.userId),
@@ -93,12 +95,21 @@ class UserTripImagesWidgetState extends State<UserTripImagesWidget> {
               },
               child: Stack(
                 children: [
-                  Image.network(
-                    tripImages[index],
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                  )
+                  CachedNetworkImage(
+                    imageUrl: tripImages[index], // URL of the image
+                    fit: BoxFit
+                        .cover, // Adjust the image size to cover the available space
+                    width: double
+                        .infinity, // Stretch image to fill the available width
+                    height: double
+                        .infinity, // Stretch image to fill the available height
+                    placeholder: (context, url) => const Center(
+                        child:
+                            CircularProgressIndicator()), // Placeholder while loading
+                    errorWidget: (context, url, error) => const Center(
+                        child:
+                            Icon(Icons.error)), // Error widget if loading fails
+                  ),
                 ],
               ),
             );

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'admin/screens/admin_screen.dart';
 import 'firebase_options.dart';
 import 'login_screen.dart';
+import 'user/screens/chatScreen/chat_utils.dart';
 import 'user/screens/user_screen.dart';
 
 Future<void> main() async {
@@ -12,7 +13,11 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
+  await ChatCacheManager.initialize();
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+  );
   Widget home;
   final user = FirebaseAuth.instance.currentUser;
 
@@ -23,12 +28,12 @@ Future<void> main() async {
         .get();
 
     if (adminSnapshot.docs.isNotEmpty) {
-      home = AdminScreen();
+      home = const AdminScreen();
     } else {
       home = UserScreen();
     }
   } else {
-    home = LoginScreen();
+    home = const LoginScreen();
   }
 
   runApp(MaterialApp(

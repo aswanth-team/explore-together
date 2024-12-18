@@ -1,6 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../data/agencies.dart';
+
+import '../../../utils/loading.dart';
 
 void main() {
   runApp(const MaterialApp(
@@ -19,26 +22,48 @@ class _TravelAgencyPageState extends State<TravelAgencyPage> {
   TextEditingController _searchController = TextEditingController();
 
   List<Map<String, dynamic>> filteredAgencies = [];
+  List<Map<String, dynamic>> allAgencies = [];
   String selectedCategory = "All";
 
   @override
   void initState() {
     super.initState();
-    filteredAgencies = agencies; // Initially, show all agencies
+    _fetchAgencies(); // Initially, show all agencies
   }
 
-  // Extract unique categories dynamically from the agencies list
+  Future<void> _fetchAgencies() async {
+    final firestore = FirebaseFirestore.instance;
+
+    try {
+      final snapshot = await firestore.collection('agencies').get();
+      final agenciesList = snapshot.docs.map((doc) {
+        return doc.data(); // Firestore documents are Map<String, dynamic>
+      }).toList();
+
+      if (mounted) {
+        // Check if the widget is still mounted
+        setState(() {
+          allAgencies = agenciesList;
+          filteredAgencies = agenciesList; // Initially display all
+        });
+      }
+    } catch (e) {
+      print("Error fetching agencies: $e");
+    }
+  }
+
+  // Extract unique categories dynamically
   List<String> getCategories() {
-    final categories = agencies.map((agency) => agency['category']).toSet();
-    return ['All', ...categories]; // Add 'All' as the default option
+    final categories = allAgencies.map((agency) => agency['category']).toSet();
+    return ['All', ...categories];
   }
 
-  // Update filtered agencies based on search and category
+  // Filter data based on search query and category
   void _filterAgencies(String query) {
     setState(() {
-      filteredAgencies = agencies.where((agency) {
+      filteredAgencies = allAgencies.where((agency) {
         final matchSearch =
-            agency['agencyName']!.toLowerCase().contains(query.toLowerCase());
+            agency['agencyName'].toLowerCase().contains(query.toLowerCase());
         final matchCategory =
             selectedCategory == "All" || agency['category'] == selectedCategory;
 
@@ -48,11 +73,7 @@ class _TravelAgencyPageState extends State<TravelAgencyPage> {
   }
 
   Future<void> _refreshData() async {
-    await Future.delayed(const Duration(seconds: 2));
-    // In a real-world app, you'd fetch new data here
-    setState(() {
-      filteredAgencies = agencies; // Reset to original agencies data
-    });
+    await _fetchAgencies();
   }
 
   @override
@@ -144,7 +165,7 @@ class _TravelAgencyPageState extends State<TravelAgencyPage> {
                         launchUrl(
                           url,
                           mode: LaunchMode.externalApplication,
-                        // ignore: body_might_complete_normally_catch_error
+                          // ignore: body_might_complete_normally_catch_error
                         ).catchError((error) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -175,11 +196,15 @@ class _TravelAgencyPageState extends State<TravelAgencyPage> {
                       ),
                       child: Row(
                         children: [
-                          Image.asset(
-                            agency['agencyImage']!,
+                          CachedNetworkImage(
+                            imageUrl: agency['agencyImage']!,
                             width: 50,
                             height: 50,
                             fit: BoxFit.cover,
+                            placeholder: (context, url) =>
+                                LoadingAnimation(), // Loading indicator
+                            errorWidget: (context, url, error) =>
+                                Icon(Icons.error), // Error widget
                           ),
                           const SizedBox(width: 16),
                           Expanded(

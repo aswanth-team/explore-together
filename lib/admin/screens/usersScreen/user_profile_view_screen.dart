@@ -1,5 +1,6 @@
 //inspect view of user profile
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -10,15 +11,16 @@ import '../messageScreen/sent_message_screen.dart';
 import 'adminViewPost&trip/current_user_posts.dart';
 import 'adminViewPost&trip/current_user_tripimage.dart';
 
-class OtherProfilePage extends StatefulWidget {
+class OtherProfilePageForAdmin extends StatefulWidget {
   final String userId;
-  const OtherProfilePage({super.key, required this.userId});
+  const OtherProfilePageForAdmin({super.key, required this.userId});
 
   @override
-  OtherProfilePageState createState() => OtherProfilePageState();
+  OtherProfilePageStateForAdmin createState() =>
+      OtherProfilePageStateForAdmin();
 }
 
-class OtherProfilePageState extends State<OtherProfilePage> {
+class OtherProfilePageStateForAdmin extends State<OtherProfilePageForAdmin> {
   bool showPosts = true;
   int totalPosts = 0;
   int completedPosts = 0;
@@ -113,9 +115,17 @@ class OtherProfilePageState extends State<OtherProfilePage> {
                                         child: ClipRRect(
                                           borderRadius: BorderRadius.circular(
                                               8.0), // Match border radius
-                                          child: Image.network(
-                                            userImage, // URL of the image
-                                            fit: BoxFit.cover,
+                                          child: CachedNetworkImage(
+                                            imageUrl:
+                                                userImage, // URL of the image
+                                            placeholder: (context, url) =>
+                                                CircularProgressIndicator(), // Placeholder widget while loading
+                                            errorWidget: (context, url,
+                                                    error) =>
+                                                Icon(Icons
+                                                    .error), // Fallback error widget if loading fails
+                                            fit: BoxFit
+                                                .cover, // Adjust the image size to cover the available space
                                           ),
                                         ),
                                       ),

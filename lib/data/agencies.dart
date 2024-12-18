@@ -10,7 +10,8 @@ List<Map<String, dynamic>> agencies = [
       'train',
       'tour packages',
       'travel deals',
-      'vacation'
+      'agencyImages'
+          'vacation'
     ],
     'category': 'Travel Agencies'
   },

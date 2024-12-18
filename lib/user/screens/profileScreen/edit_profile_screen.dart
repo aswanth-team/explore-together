@@ -193,9 +193,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             });
                           }
                         },
-                        child: Text(_dob != null
-                            ? '${_dob!.year}-${_dob!.month}-${_dob!.day}'
-                            : 'Select DOB'),
+                        child: Text(
+                          _dob != null
+                              ? '${_dob!.year}-${_dob!.month}-${_dob!.day}'
+                              : 'Select DOB',
+                        ),
                       ),
                     ),
                   ],

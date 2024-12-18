@@ -61,7 +61,7 @@ class UserPostsWidgetState extends State<UserPostsWidget> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => PostDetailScreen(
+                          builder: (context) => OtherUserPostDetailScreen(
                             postId: post['postId'],
                             userId: widget.userId,
                           ),

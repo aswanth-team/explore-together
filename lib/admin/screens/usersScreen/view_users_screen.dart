@@ -124,8 +124,8 @@ class UserSearchPageState extends State<UserSearchPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) =>
-                                  OtherProfilePage(userId: user['userId'])),
+                              builder: (context) => OtherProfilePageForAdmin(
+                                  userId: user['userId'])),
                         );
                       },
                       child: Card(

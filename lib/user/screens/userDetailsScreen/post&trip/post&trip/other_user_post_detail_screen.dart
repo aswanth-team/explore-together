@@ -8,21 +8,21 @@ import '../../../profileScreen/post&trip/post_image_swipe.dart';
 import '../../../user_screen.dart';
 import '../../others_user_profile.dart';
 
-class PostDetailScreen extends StatefulWidget {
+class OtherUserPostDetailScreen extends StatefulWidget {
   final String postId;
   final String userId;
 
-  const PostDetailScreen({
+  const OtherUserPostDetailScreen({
     super.key,
     required this.postId,
     required this.userId,
   });
 
   @override
-  State<PostDetailScreen> createState() => _PostDetailScreenState();
+  State<OtherUserPostDetailScreen> createState() => _OtherUserPostDetailScreenState();
 }
 
-class _PostDetailScreenState extends State<PostDetailScreen> {
+class _OtherUserPostDetailScreenState extends State<OtherUserPostDetailScreen> {
   final UserService _userService = UserService();
   final UserPostServices _userPostServices = UserPostServices();
 

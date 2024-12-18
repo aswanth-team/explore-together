@@ -38,9 +38,16 @@ class HomePageState extends State<HomePage> {
   DocumentSnapshot? _lastDocument;
   final int _pageSize = 5;
 
+  void enableOfflinePersistence() {
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true, // Enable offline persistence
+    );
+  }
+
   @override
   void initState() {
     super.initState();
+    enableOfflinePersistence();
     fetchSuggestions();
     _scrollController.addListener(_onScroll);
     _fetchInitialPosts();
@@ -307,20 +314,11 @@ class HomePageState extends State<HomePage> {
             });
           },
           decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.white,
             hintText: 'Search...',
-            hintStyle: TextStyle(color: Colors.grey[500], fontSize: 16),
-            prefixIcon: Icon(
-              Icons.search,
-              color: Colors.grey[600],
-            ),
+            prefixIcon: Icon(Icons.search),
             suffixIcon: _searchQuery.isNotEmpty
                 ? IconButton(
-                    icon: Icon(
-                      Icons.clear,
-                      color: Colors.grey[600],
-                    ),
+                    icon: const Icon(Icons.clear),
                     onPressed: () {
                       setState(() {
                         _searchController.clear();
@@ -331,12 +329,6 @@ class HomePageState extends State<HomePage> {
                     },
                   )
                 : null,
-            contentPadding:
-                const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(30),
-              borderSide: BorderSide.none,
-            ),
           ),
         ),
       ),
@@ -454,8 +446,8 @@ class HomePageState extends State<HomePage> {
                                           },
                                           child: Container(
                                               width:
-                                                  50, // Slightly larger than CircleAvatar radius * 2
-                                              height: 50,
+                                                  60, // Slightly larger than CircleAvatar radius * 2
+                                              height: 60,
                                               decoration: BoxDecoration(
                                                 shape: BoxShape.circle,
                                                 border: Border.all(
@@ -470,9 +462,22 @@ class HomePageState extends State<HomePage> {
                                                 radius: 20,
                                                 backgroundImage:
                                                     CachedNetworkImageProvider(
-                                                        user['userimage']),
+                                                  user['userimage'],
+                                                ),
                                                 backgroundColor:
                                                     Colors.transparent,
+                                                child: ClipOval(
+                                                  child: CachedNetworkImage(
+                                                    imageUrl: user['userimage'],
+                                                    placeholder: (context,
+                                                            url) =>
+                                                        CircularProgressIndicator(),
+                                                    errorWidget:
+                                                        (context, url, error) =>
+                                                            Icon(Icons.error),
+                                                    fit: BoxFit.cover,
+                                                  ),
+                                                ),
                                               ))),
                                       SizedBox(width: 10),
                                       GestureDetector(
@@ -497,9 +502,8 @@ class HomePageState extends State<HomePage> {
                                         },
                                         child: Text(
                                           user['username'],
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16),
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold),
                                         ),
                                       ),
                                     ],
@@ -513,10 +517,8 @@ class HomePageState extends State<HomePage> {
                                       child: CachedNetworkImage(
                                         imageUrl: locationImages[0],
                                         fit: BoxFit.cover,
-                                        placeholder: (context, url) =>
-                                            const Center(
-                                                child:
-                                                    CircularProgressIndicator()),
+                                        placeholder: (context, url) => Center(
+                                            child: CircularProgressIndicator()),
                                         errorWidget: (context, url, error) =>
                                             Icon(Icons.error, size: 50),
                                       ),
@@ -533,13 +535,11 @@ class HomePageState extends State<HomePage> {
                                   ),
                                   Padding(
                                     padding: const EdgeInsets.symmetric(
-                                        vertical: 4.0, horizontal: 30),
+                                        vertical: 4.0),
                                     child: Text(
                                       locationDescription,
                                       style:
                                           const TextStyle(color: Colors.grey),
-                                      maxLines: 1, // Restrict to one line
-                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],
