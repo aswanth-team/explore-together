@@ -1,45 +1,66 @@
+import 'dart:math';
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../data/agencies.dart';
-import 'agency_upload_screen.dart';
-
-void main() {
-  runApp(const MaterialApp(
-    home: TravelAgencyPage(),
-  ));
-}
+import '../../../utils/loading.dart';
+import 'edit_agencies_screen.dart';
 
 class TravelAgencyPage extends StatefulWidget {
   const TravelAgencyPage({super.key});
 
   @override
-  _TravelAgencyPageState createState() => _TravelAgencyPageState();
+  TravelAgencyPageState createState() => TravelAgencyPageState();
 }
 
-class _TravelAgencyPageState extends State<TravelAgencyPage> {
-  TextEditingController _searchController = TextEditingController();
+class TravelAgencyPageState extends State<TravelAgencyPage> {
+  final TextEditingController _searchController = TextEditingController();
 
   List<Map<String, dynamic>> filteredAgencies = [];
+  List<Map<String, dynamic>> allAgencies = [];
   String selectedCategory = "All";
 
   @override
   void initState() {
     super.initState();
-    filteredAgencies = agencies; // Initially, show all agencies
+    _fetchAgencies(); // Initially, show all agencies
   }
 
-  // Extract unique categories dynamically from the agencies list
+  Future<void> _fetchAgencies() async {
+    final firestore = FirebaseFirestore.instance;
+
+    try {
+      final snapshot = await firestore.collection('agencies').get();
+      final agenciesList = snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id; 
+        return data;
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          allAgencies = agenciesList..shuffle(Random());
+          filteredAgencies = allAgencies; 
+        });
+      }
+    } catch (e) {
+      print("Error fetching agencies: $e");
+    }
+  }
+
+  // Extract unique categories dynamically
   List<String> getCategories() {
-    final categories = agencies.map((agency) => agency['category']).toSet();
-    return ['All', ...categories]; // Add 'All' as the default option
+    final categories = allAgencies.map((agency) => agency['category']).toSet();
+    return ['All', ...categories];
   }
 
-  // Update filtered agencies based on search and category
+  // Filter data based on search query and category
   void _filterAgencies(String query) {
     setState(() {
-      filteredAgencies = agencies.where((agency) {
+      filteredAgencies = allAgencies.where((agency) {
         final matchSearch =
-            agency['agencyName']!.toLowerCase().contains(query.toLowerCase());
+            agency['agencyName'].toLowerCase().contains(query.toLowerCase());
         final matchCategory =
             selectedCategory == "All" || agency['category'] == selectedCategory;
 
@@ -49,18 +70,7 @@ class _TravelAgencyPageState extends State<TravelAgencyPage> {
   }
 
   Future<void> _refreshData() async {
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() {
-      filteredAgencies = agencies; // Reset to original agencies data
-    });
-  }
-
-  // Function to delete agency
-  void _deleteAgency(String agencyId) {
-    setState(() {
-      filteredAgencies.removeWhere((agency) => agency['agencyId'] == agencyId);
-    });
-    print("Agency with ID $agencyId deleted.");
+    await _fetchAgencies();
   }
 
   @override
@@ -149,7 +159,6 @@ class _TravelAgencyPageState extends State<TravelAgencyPage> {
                     onTap: () {
                       final url = Uri.parse(agency['agencyWeb']!);
                       if (url.scheme == 'http' || url.scheme == 'https') {
-                        // Launch in an external browser
                         launchUrl(
                           url,
                           mode: LaunchMode.externalApplication,
@@ -183,11 +192,14 @@ class _TravelAgencyPageState extends State<TravelAgencyPage> {
                       ),
                       child: Row(
                         children: [
-                          Image.asset(
-                            agency['agencyImage']!,
+                          CachedNetworkImage(
+                            imageUrl: agency['agencyImage']!,
                             width: 50,
                             height: 50,
                             fit: BoxFit.cover,
+                            placeholder: (context, url) => LoadingAnimation(),
+                            errorWidget: (context, url, error) =>
+                                Icon(Icons.error),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -198,10 +210,25 @@ class _TravelAgencyPageState extends State<TravelAgencyPage> {
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
+                            icon: Icon(Icons.edit, color: Colors.blue),
                             onPressed: () {
-                              _deleteAgency(
-                                  agency['agencyId']!); // Call delete function
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      EditAgencyPage(agency: agency),
+                                ),
+                              );
+                            },
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.delete, color: Colors.red),
+                            onPressed: () async {
+                              await FirebaseFirestore.instance
+                                  .collection('agencies')
+                                  .doc(agency['id'])
+                                  .delete();
+                              _refreshData(); // Refresh after deletion
                             },
                           ),
                         ],
@@ -213,24 +240,6 @@ class _TravelAgencyPageState extends State<TravelAgencyPage> {
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => UploadAgencyPage()),
-          );
-
-          if (result != null) {
-            // Handle the result (new agency added)
-            setState(() {
-              agencies.add(result); // Add the new agency to the list
-              filteredAgencies = agencies; // Update filtered agencies
-            });
-          }
-        },
-        child: const Icon(Icons.add),
-        tooltip: 'Upload Agency',
       ),
     );
   }

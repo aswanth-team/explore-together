@@ -52,7 +52,7 @@ dependencies:
   rxdart: ^0.28.0
   fluttertoast: ^8.2.10
   mockito: ^5.4.4
-  build_runner: 2.4.13
+  flutter_gemini: ^3.0.0
 
 
 dev_dependencies:

@@ -15,9 +15,9 @@ class ChatCacheManager {
   late Database _database;
 
   // Initialize database asynchronously
-  static Future<void> initialize() async {
+  /* static Future<void> initialize() async {
     await _instance.initDatabase();
-  }
+  }*/
 
   // Initialize the database and create table
   Future<void> initDatabase() async {
@@ -39,6 +39,14 @@ class ChatCacheManager {
       },
       version: 2, // Increment version for migration
     );
+  }
+
+  Future<void> clearCache() async {
+    try {
+      await _database.delete('messages'); // Clears all messages
+    } catch (e) {
+      print('Error clearing cache: $e');
+    }
   }
 
   // Cache the message in the local database
@@ -165,6 +173,15 @@ class PreferencesManager {
     }
   }
 
+  static Future<void> clearPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear(); // Clears all saved preferences
+    } catch (e) {
+      print('Error clearing preferences: $e');
+    }
+  }
+
   // Add an option to load a subset of chats
   static Future<List<Map<String, dynamic>>> loadChats({int limit = 50}) async {
     try {
@@ -207,5 +224,16 @@ class OptimizedNetworkImage extends StatelessWidget {
       memCacheWidth: 250, // Limit memory cache width
       maxWidthDiskCache: 500, // Limit disk cache width
     );
+  }
+
+  static Future<void> clearImageCache() async {
+    try {
+      // Clears the image cache for both live and stored images
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+      print('All cached images cleared.');
+    } catch (e) {
+      print('Error clearing image cache: $e');
+    }
   }
 }

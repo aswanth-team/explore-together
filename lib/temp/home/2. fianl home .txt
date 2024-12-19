@@ -10,7 +10,6 @@ import '../../../utils/loading.dart';
 import '../profileScreen/post&trip/post_detail_screen.dart';
 import '../userDetailsScreen/others_user_profile.dart';
 import '../userDetailsScreen/post&trip/post&trip/other_user_post_detail_screen.dart';
-import 'chatbot.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -51,21 +50,17 @@ class HomePageState extends State<HomePage> {
     final querySnapshot =
         await FirebaseFirestore.instance.collection('post').get();
 
-    if (!mounted) return;
-
     final suggestionSet = <String>{};
     for (var doc in querySnapshot.docs) {
       final data = doc.data();
-      suggestionSet.add(data['locationName'] ?? '');
+      suggestionSet.add(data['locationName']);
       suggestionSet.addAll(List<String>.from(data['visitedPlaces'] ?? []));
       suggestionSet.addAll(List<String>.from(data['planToVisitPlaces'] ?? []));
     }
 
-    if (mounted) {
-      setState(() {
-        suggestions = suggestionSet.toList();
-      });
-    }
+    setState(() {
+      suggestions = suggestionSet.toList();
+    });
   }
 
   Future<void> _fetchInitialPosts() async {
@@ -77,7 +72,7 @@ class HomePageState extends State<HomePage> {
       final randomQuery = await FirebaseFirestore.instance
           .collection('post')
           .orderBy(FieldPath.documentId)
-          .limit(_pageSize) // Fetch extra posts for better shuffling
+          .limit(_pageSize * 3) // Fetch extra posts for better shuffling
           .get();
 
       // Filter out already shown posts
@@ -107,12 +102,10 @@ class HomePageState extends State<HomePage> {
       // Fetch users for posts
       await _fetchUsersForPosts(filteredDocs);
 
-      if (mounted) {
-        setState(() {
-          posts = filteredDocs;
-          isLoading = false;
-        });
-      }
+      setState(() {
+        posts = filteredDocs;
+        isLoading = false;
+      });
     } catch (e) {
       print('Error fetching initial posts: $e');
       setState(() {
@@ -134,7 +127,7 @@ class HomePageState extends State<HomePage> {
           .collection('post')
           .orderBy(FieldPath.documentId)
           .startAfterDocument(_lastDocument!)
-          .limit(_pageSize) // Fetch extra posts for better shuffling
+          .limit(_pageSize * 3) // Fetch extra posts for better shuffling
           .get();
 
       // Filter out already shown posts
@@ -181,23 +174,19 @@ class HomePageState extends State<HomePage> {
 
     if (userIds.isEmpty) return;
 
-    try {
-      final userSnapshots = await FirebaseFirestore.instance
-          .collection('user')
-          .where(FieldPath.documentId, whereIn: userIds.toList())
-          .get();
+    final userSnapshots = await FirebaseFirestore.instance
+        .collection('user')
+        .where(FieldPath.documentId, whereIn: userIds.toList())
+        .get();
 
-      final newUsers = {
-        for (var doc in userSnapshots.docs)
-          doc.id: doc.data() as Map<String, dynamic>
-      };
+    final newUsers = {
+      for (var doc in userSnapshots.docs)
+        doc.id: doc.data() as Map<String, dynamic>
+    };
 
-      setState(() {
-        users.addAll(newUsers);
-      });
-    } catch (e) {
-      print('Error fetching user data: $e');
-    }
+    setState(() {
+      users.addAll(newUsers);
+    });
   }
 
   Future<void> _searchPosts() async {
@@ -293,7 +282,6 @@ class HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
-    _scrollController.removeListener(_onScroll);
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -566,15 +554,8 @@ class HomePageState extends State<HomePage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return const ChatPopup();
-            },
-          );
-        },
-        child: const Icon(Icons.chat),
+        onPressed: () {},
+        child: const Icon(Icons.add),
         backgroundColor: Colors.blue,
         mini: true,
         shape: RoundedRectangleBorder(

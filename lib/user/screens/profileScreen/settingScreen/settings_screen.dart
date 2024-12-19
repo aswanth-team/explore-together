@@ -1,11 +1,32 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../../../login_screen.dart';
+import '../../chatScreen/chat_utils.dart';
 import 'accoundManagement/account_management_screen.dart';
 import 'help/help_screen.dart';
 import 'support/support_screen.dart';
 
 class SettingsPage extends StatelessWidget {
+  Future<void> clearFirestoreCache() async {
+    try {
+      await FirebaseFirestore.instance.clearPersistence();
+    } catch (e) {
+      print('Error clearing Firestore cache: $e');
+    }
+  }
+
+  Future<void> clearImageCache() async {
+    try {
+      final imageCache = PaintingBinding.instance.imageCache;
+      imageCache.clear();
+      imageCache.clearLiveImages();
+      print('All image cache cleared.');
+    } catch (e) {
+      print('Error clearing image cache: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -61,7 +82,7 @@ class SettingsPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(15.0),
                   ),
                   backgroundColor: Colors.white,
-                  title: Row(
+                  title: const Row(
                     children: [
                       Icon(Icons.warning_amber_rounded,
                           color: Colors.red, size: 28),
@@ -114,6 +135,16 @@ class SettingsPage extends StatelessWidget {
                 ),
               );
               if (shouldLogout == true) {
+                await OptimizedNetworkImage.clearImageCache();
+
+                // Clear Firestore cache
+                await clearFirestoreCache();
+
+                // Clear local database cache
+                await ChatCacheManager().clearCache();
+
+                // Clear shared preferences
+                await PreferencesManager.clearPreferences();
                 await FirebaseAuth.instance.signOut();
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => LoginScreen()),

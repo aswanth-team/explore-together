@@ -2,22 +2,26 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_gemini/flutter_gemini.dart';
 import 'admin/screens/admin_screen.dart';
 import 'firebase_options.dart';
 import 'login_screen.dart';
 import 'user/screens/chatScreen/chat_utils.dart';
 import 'user/screens/user_screen.dart';
 
+const apiKey = 'AIzaSyAwjcN3Aei78CJ6YP2Ok-W47i-Z_5k_5EE';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  await ChatCacheManager.initialize();
+  await ChatCacheManager().initDatabase();
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
+  Gemini.init(apiKey: apiKey);
   Widget home;
   final user = FirebaseAuth.instance.currentUser;
 
