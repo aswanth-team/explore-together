@@ -9,7 +9,7 @@ import 'login_screen.dart';
 import 'user/screens/chatScreen/chat_utils.dart';
 import 'user/screens/user_screen.dart';
 
-const apiKey = 'AIzaSyAwjcN3Aei78CJ6YP2Ok-W47i-Z_5k_5EE';
+const apiKey = '-GEMINI API-';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
