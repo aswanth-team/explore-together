@@ -157,7 +157,7 @@ class HomePageState extends State<HomePage> {
 
     final newUsers = {
       for (var doc in userSnapshots.docs)
-        doc.id: doc.data() as Map<String, dynamic>
+        doc.id: doc.data()
     };
 
     setState(() {
