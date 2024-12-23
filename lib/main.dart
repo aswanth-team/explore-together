@@ -10,7 +10,7 @@ import 'firebase_options.dart';
 import 'login_screen.dart';
 import 'user/screens/user_screen.dart';
 
-const apiKey = 'AIzaSyAwjcN3Aei78CJ6YP2Ok-W47i-Z_5k_5EE';
+const apiKey = '-GEMINI API-';
 
 Future<void> initializeServices() async {
   WidgetsFlutterBinding.ensureInitialized();
