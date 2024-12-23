@@ -1,5 +1,3 @@
-//inspect view of user profile
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,22 +7,44 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../utils/app_colors.dart';
 import '../../../utils/loading.dart';
 import '../chatScreen/chating_screen.dart';
+import '../followersScreen/followers_screen.dart';
 import 'post&trip/post&trip/other_user_posts.dart';
 import 'post&trip/post&trip/other_user_tripimage.dart';
+import 'report_screen.dart';
 
 class OtherProfilePage extends StatefulWidget {
   final String userId;
   const OtherProfilePage({super.key, required this.userId});
 
   @override
-  _OtherProfilePageState createState() => _OtherProfilePageState();
+  OtherProfilePageState createState() => OtherProfilePageState();
 }
 
-class _OtherProfilePageState extends State<OtherProfilePage> {
+class OtherProfilePageState extends State<OtherProfilePage> {
   bool showPosts = true;
   int totalPosts = 0;
   int completedPosts = 0;
   String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+  bool isFollowing = false;
+  int followersCount = 0;
+
+  void _reloadChats() {}
+
+  Future<void> _getFollowersCount() async {
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('user')
+          .doc(widget.userId)
+          .get();
+
+      final followersList = userDoc.data()?['following'] ?? [];
+      setState(() {
+        followersCount = followersList.length;
+      });
+    } catch (e) {
+      print('Error fetching followers count: $e');
+    }
+  }
 
   Future<String> _getOrCreateChatRoom() async {
     try {
@@ -32,16 +52,12 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
           .collection('chat')
           .where('user', arrayContains: currentUserId)
           .get();
-
-      // Check if a chat room already exists
       for (var doc in chatQuery.docs) {
         final userIds = doc.data()['user'] as List<dynamic>? ?? [];
         if (userIds.contains(widget.userId)) {
-          return doc.id; // Return the existing chat room ID
+          return doc.id;
         }
       }
-
-      // Create a new chat room if no existing room is found
       final newChatDoc =
           await FirebaseFirestore.instance.collection('chat').add({
         'user': [currentUserId, widget.userId],
@@ -49,9 +65,54 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      return newChatDoc.id; // Return the new chat room ID
+      return newChatDoc.id;
     } catch (error) {
       throw Exception('Error creating or retrieving chat room: $error');
+    }
+  }
+
+  Future<void> _checkFollowingStatus() async {
+    try {
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('user')
+          .doc(widget.userId)
+          .get();
+
+      if (userDoc.exists) {
+        List<dynamic> followingList = userDoc['following'] ?? [];
+        setState(() {
+          isFollowing = followingList.contains(currentUserId);
+        });
+      }
+    } catch (e) {
+      print('Error checking following status: $e');
+    }
+  }
+
+  Future<void> _toggleFollow() async {
+    try {
+      DocumentReference userDocRef =
+          FirebaseFirestore.instance.collection('user').doc(widget.userId);
+
+      if (isFollowing) {
+        await userDocRef.update({
+          'following': FieldValue.arrayRemove([currentUserId]),
+        });
+        setState(() {
+          isFollowing = false;
+          followersCount = followersCount - 1;
+        });
+      } else {
+        await userDocRef.update({
+          'following': FieldValue.arrayUnion([currentUserId]),
+        });
+        setState(() {
+          isFollowing = true;
+          followersCount = followersCount + 1;
+        });
+      }
+    } catch (e) {
+      print('Error toggling follow status: $e');
     }
   }
 
@@ -79,13 +140,40 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
   void initState() {
     super.initState();
     _getUserProfilePosts();
+    _checkFollowingStatus();
+    _getFollowersCount();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Profile..'),
+        title: const Text('Profile..'),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'Report') {
+                showDialog(
+                  context: context,
+                  builder: (context) => ReportDialog(
+                    userId: widget.userId,
+                    currentUserId: currentUserId,
+                  ),
+                );
+              }
+            },
+            itemBuilder: (BuildContext context) {
+              return [
+                const PopupMenuItem<String>(
+                  value: 'Report',
+                  child: Text('Report'),
+                ),
+              ];
+            },
+            icon: const Icon(Icons.more_vert),
+            offset: const Offset(0, 50),
+          ),
+        ],
       ),
       body: StreamBuilder(
         stream: FirebaseFirestore.instance
@@ -110,7 +198,6 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
           } else if (snapshot.hasData) {
             final profileData = snapshot.data?.data();
             var userImage = profileData!['userimage'];
-            print(profileData);
             return SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,10 +237,10 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                                             imageUrl:
                                                 userImage, // URL of the image
                                             placeholder: (context, url) =>
-                                                CircularProgressIndicator(), // Placeholder widget while loading
+                                                const LoadingAnimation(), // Placeholder widget while loading
                                             errorWidget: (context, url,
                                                     error) =>
-                                                Icon(Icons
+                                                const Icon(Icons
                                                     .error), // Fallback error widget if loading fails
                                             fit: BoxFit
                                                 .cover, // Adjust the image size to cover the available space
@@ -196,6 +283,46 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                                     .center, // Center the row content
                                 children: [
                                   // Column for "Posts"
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              FollowingUsersPage(
+                                                  userId: widget.userId),
+                                        ),
+                                      );
+                                    },
+                                    child: Material(
+                                      color: Colors
+                                          .transparent, // Ensure no visual change
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            '$followersCount',
+                                            style: const TextStyle(
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const Text(
+                                            'Buddies',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(width: 30),
                                   Column(
                                     mainAxisAlignment: MainAxisAlignment
                                         .center, // Center the content vertically in the column
@@ -206,7 +333,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                                         '$totalPosts', // The count (number) at the top
                                         style: const TextStyle(
                                           fontSize:
-                                              24, // Larger font size for the count
+                                              22, // Larger font size for the count
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -221,7 +348,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                                     ],
                                   ),
 
-                                  const SizedBox(width: 60),
+                                  const SizedBox(width: 30),
 
                                   // Column for "Completed"
                                   Column(
@@ -234,7 +361,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                                         '$completedPosts', // The count (number) at the top
                                         style: const TextStyle(
                                           fontSize:
-                                              24, // Larger font size for the count
+                                              22, // Larger font size for the count
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -265,13 +392,13 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                         Text(
                           profileData['fullname'],
                           style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.bold),
+                              fontSize: 15, fontWeight: FontWeight.bold),
                         ),
+                        // const SizedBox(height: 8),
+                        // Text('DOB: ${profileData['dob']}'),
+                        // const SizedBox(height: 8),
+                        //  Text('Gender: ${profileData['gender']}'),
                         const SizedBox(height: 8),
-                        Text('DOB: ${profileData['dob']}'),
-                        const SizedBox(height: 8),
-                        Text('Gender: ${profileData['gender']}'),
-                        const SizedBox(height: 16),
                         Text(profileData['userbio'] ?? '',
                             style: const TextStyle(fontSize: 14)),
                       ],
@@ -334,6 +461,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                   const SizedBox(
                     height: 10,
                   ),
+
                   Center(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -346,6 +474,32 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               // Edit Profile button
+                              SizedBox(
+                                width: MediaQuery.of(context).size.width *
+                                    0.45, // 45% of the width for each button
+                                child: ElevatedButton(
+                                  onPressed: _toggleFollow,
+                                  style: ElevatedButton.styleFrom(
+                                    foregroundColor: Colors.black,
+                                    backgroundColor: Colors
+                                        .white, // Set background color to white
+                                    side: const BorderSide(
+                                      color: Colors.black,
+                                      width:
+                                          0.3, // Decreased the border width to 1
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                          5), // Decreased border radius
+                                    ),
+                                  ),
+                                  child: Text(
+                                      isFollowing ? "Following" : "Follow"),
+                                ),
+                              ),
+                              const SizedBox(
+                                  width: 5), // Add spacing between the buttons
+                              // Settings button
                               SizedBox(
                                 width: MediaQuery.of(context).size.width *
                                     0.45, // 45% of the width for each button
@@ -363,6 +517,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                                             currentUserId: currentUserId,
                                             chatUserId: widget.userId,
                                             chatRoomId: chatRoomId,
+                                            onMessageSent: _reloadChats,
                                           ),
                                         ),
                                       );
@@ -374,9 +529,9 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                                     }
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    foregroundColor: Colors.white,
+                                    foregroundColor: Colors.black,
                                     backgroundColor: Colors
-                                        .greenAccent, // Set background color to white
+                                        .white, // Set background color to white
                                     side: const BorderSide(
                                       color: Colors.black,
                                       width:
@@ -387,32 +542,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                                           5), // Decreased border radius
                                     ),
                                   ),
-                                  child: const Text("Chat"),
-                                ),
-                              ),
-                              const SizedBox(
-                                  width: 5), // Add spacing between the buttons
-                              // Settings button
-                              SizedBox(
-                                width: MediaQuery.of(context).size.width *
-                                    0.45, // 45% of the width for each button
-                                child: ElevatedButton(
-                                  onPressed: () {},
-                                  style: ElevatedButton.styleFrom(
-                                    foregroundColor: Colors.white,
-                                    backgroundColor: Colors
-                                        .redAccent, // Set background color to white
-                                    side: const BorderSide(
-                                      color: Colors.black,
-                                      width:
-                                          0.3, // Decreased the border width to 1
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(
-                                          5), // Decreased border radius
-                                    ),
-                                  ),
-                                  child: const Text("Report"),
+                                  child: const Text("Message"),
                                 ),
                               ),
                             ],

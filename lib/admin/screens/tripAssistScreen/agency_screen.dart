@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../utils/loading.dart';
 import 'edit_agencies_screen.dart';
+import 'upload_agency_screen.dart';
 
 class TravelAgencyPage extends StatefulWidget {
   const TravelAgencyPage({super.key});
@@ -34,28 +35,24 @@ class TravelAgencyPageState extends State<TravelAgencyPage> {
       final snapshot = await firestore.collection('agencies').get();
       final agenciesList = snapshot.docs.map((doc) {
         final data = doc.data();
-        data['id'] = doc.id; 
+        data['id'] = doc.id;
         return data;
       }).toList();
 
       if (mounted) {
         setState(() {
           allAgencies = agenciesList..shuffle(Random());
-          filteredAgencies = allAgencies; 
+          filteredAgencies = allAgencies;
         });
       }
     } catch (e) {
       print("Error fetching agencies: $e");
     }
   }
-
-  // Extract unique categories dynamically
   List<String> getCategories() {
     final categories = allAgencies.map((agency) => agency['category']).toSet();
     return ['All', ...categories];
   }
-
-  // Filter data based on search query and category
   void _filterAgencies(String query) {
     setState(() {
       filteredAgencies = allAgencies.where((agency) {
@@ -240,6 +237,22 @@ class TravelAgencyPageState extends State<TravelAgencyPage> {
             ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return const UploadAgencyPage();
+            },
+          );
+        },
+        backgroundColor: Colors.blue,
+        mini: true,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(50),
+        ),
+        child: const Icon(Icons.add),
       ),
     );
   }

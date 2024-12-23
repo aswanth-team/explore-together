@@ -1,10 +1,10 @@
-//inspect view of user profile
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../services/one_signal.dart';
+import '../../../user/screens/followersScreen/followers_screen.dart';
 import '../../../utils/app_colors.dart';
 import '../../../utils/loading.dart';
 import '../messageScreen/sent_message_screen.dart';
@@ -24,6 +24,23 @@ class OtherProfilePageStateForAdmin extends State<OtherProfilePageForAdmin> {
   bool showPosts = true;
   int totalPosts = 0;
   int completedPosts = 0;
+  int followersCount = 0;
+
+  Future<void> _getFollowersCount() async {
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('user')
+          .doc(widget.userId)
+          .get();
+
+      final followersList = userDoc.data()?['following'] ?? [];
+      setState(() {
+        followersCount = followersList.length;
+      });
+    } catch (e) {
+      print('Error fetching followers count: $e');
+    }
+  }
 
   Future<void> _getUserProfilePosts() async {
     try {
@@ -49,6 +66,7 @@ class OtherProfilePageStateForAdmin extends State<OtherProfilePageForAdmin> {
   void initState() {
     super.initState();
     _getUserProfilePosts();
+    _getFollowersCount();
   }
 
   @override
@@ -97,35 +115,30 @@ class OtherProfilePageStateForAdmin extends State<OtherProfilePageForAdmin> {
                                   backgroundColor: Colors.transparent,
                                   child: GestureDetector(
                                     onTap: () {
-                                      Navigator.of(context)
-                                          .pop(); // Close the dialog on tap
+                                      Navigator.of(context).pop();
                                     },
                                     child: InteractiveViewer(
                                       child: Container(
                                         decoration: BoxDecoration(
                                           border: Border.all(
                                             color: AppColors.genderBorderColor(
-                                                profileData['gender'] ??
-                                                    ''), // Use gender to determine border color
-                                            width: 1.0, // Set border width
+                                                profileData['gender'] ?? ''),
+                                            width: 1.0,
                                           ),
-                                          borderRadius: BorderRadius.circular(
-                                              8.0), // Optional: Rounded corners
+                                          borderRadius:
+                                              BorderRadius.circular(8.0),
                                         ),
                                         child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                              8.0), // Match border radius
+                                          borderRadius:
+                                              BorderRadius.circular(8.0),
                                           child: CachedNetworkImage(
-                                            imageUrl:
-                                                userImage, // URL of the image
+                                            imageUrl: userImage,
                                             placeholder: (context, url) =>
-                                                CircularProgressIndicator(), // Placeholder widget while loading
-                                            errorWidget: (context, url,
-                                                    error) =>
-                                                Icon(Icons
-                                                    .error), // Fallback error widget if loading fails
-                                            fit: BoxFit
-                                                .cover, // Adjust the image size to cover the available space
+                                                const LoadingAnimation(),
+                                            errorWidget:
+                                                (context, url, error) =>
+                                                    const Icon(Icons.error),
+                                            fit: BoxFit.cover,
                                           ),
                                         ),
                                       ),
@@ -142,9 +155,8 @@ class OtherProfilePageStateForAdmin extends State<OtherProfilePageForAdmin> {
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: AppColors.genderBorderColor(
-                                    profileData['gender'] ??
-                                        ''), // Dynamically set border color
-                                width: 2, // Border width
+                                    profileData['gender'] ?? ''),
+                                width: 2,
                               ),
                             ),
                             child: CircleAvatar(
@@ -160,57 +172,84 @@ class OtherProfilePageStateForAdmin extends State<OtherProfilePageForAdmin> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment
-                                    .center, // Center the row content
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  // Column for "Posts"
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              FollowingUsersPage(
+                                                  userId: widget.userId),
+                                        ),
+                                      );
+                                    },
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            '$followersCount',
+                                            style: const TextStyle(
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const Text(
+                                            'Buddies',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 30),
                                   Column(
-                                    mainAxisAlignment: MainAxisAlignment
-                                        .center, // Center the content vertically in the column
-                                    crossAxisAlignment: CrossAxisAlignment
-                                        .center, // Align content to the center horizontally
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Text(
-                                        '$totalPosts', // The count (number) at the top
+                                        '$totalPosts',
                                         style: const TextStyle(
-                                          fontSize:
-                                              24, // Larger font size for the count
+                                          fontSize: 22,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                       const Text(
-                                        'Posts', // Label below the count
+                                        'Posts',
                                         style: TextStyle(
-                                          fontSize:
-                                              12, // Smaller font size for the label
+                                          fontSize: 12,
                                           fontWeight: FontWeight.normal,
                                         ),
                                       ),
                                     ],
                                   ),
-
-                                  const SizedBox(width: 60),
-
-                                  // Column for "Completed"
+                                  const SizedBox(width: 30),
                                   Column(
-                                    mainAxisAlignment: MainAxisAlignment
-                                        .center, // Center the content vertically in the column
-                                    crossAxisAlignment: CrossAxisAlignment
-                                        .center, // Align content to the center horizontally
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Text(
-                                        '$completedPosts', // The count (number) at the top
+                                        '$completedPosts',
                                         style: const TextStyle(
-                                          fontSize:
-                                              24, // Larger font size for the count
+                                          fontSize: 22,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                       const Text(
-                                        'Completed', // Label below the count
+                                        'Completed',
                                         style: TextStyle(
-                                          fontSize:
-                                              12, // Smaller font size for the label
+                                          fontSize: 12,
                                           fontWeight: FontWeight.normal,
                                         ),
                                       ),
@@ -233,13 +272,13 @@ class OtherProfilePageStateForAdmin extends State<OtherProfilePageForAdmin> {
                         Text(
                           profileData['fullname'],
                           style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.bold),
+                              fontSize: 15, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 8),
-                        Text('DOB: ${profileData['dob']}'),
-                        const SizedBox(height: 8),
-                        Text('Gender: ${profileData['gender']}'),
-                        const SizedBox(height: 16),
+                        //  Text('DOB: ${profileData['dob']}'),
+                        // const SizedBox(height: 8),
+                        // Text('Gender: ${profileData['gender']}'),
+                        // const SizedBox(height: 16),
                         Text(profileData['userbio'] ?? '',
                             style: const TextStyle(fontSize: 14)),
                       ],
@@ -305,17 +344,13 @@ class OtherProfilePageStateForAdmin extends State<OtherProfilePageForAdmin> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Create a container to wrap the buttons and set its width to 95% of the device width
                         SizedBox(
-                          width: MediaQuery.of(context).size.width *
-                              0.95, // 95% of the device width
+                          width: MediaQuery.of(context).size.width * 0.95,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // Edit Profile button
                               SizedBox(
-                                width: MediaQuery.of(context).size.width *
-                                    0.45, // 45% of the width for each button
+                                width: MediaQuery.of(context).size.width * 0.45,
                                 child: ElevatedButton(
                                   onPressed: () {
                                     Navigator.push(
@@ -324,8 +359,7 @@ class OtherProfilePageStateForAdmin extends State<OtherProfilePageForAdmin> {
                                         builder: (context) => SentMessagePage(
                                           userNameFromPreviousPage:
                                               profileData['username'],
-                                          disableSendToAll:
-                                              true, // Disable the switch
+                                          disableSendToAll: true,
                                         ),
                                       ),
                                     );
@@ -347,24 +381,47 @@ class OtherProfilePageStateForAdmin extends State<OtherProfilePageForAdmin> {
                                   child: const Text("Notify"),
                                 ),
                               ),
-                              const SizedBox(
-                                  width: 5), // Add spacing between the buttons
-                              // Settings button
+                              const SizedBox(width: 5),
                               SizedBox(
-                                width: MediaQuery.of(context).size.width *
-                                    0.45, // 45% of the width for each button
+                                width: MediaQuery.of(context).size.width * 0.45,
                                 child: ElevatedButton(
                                   onPressed: () async {
-                                    // Toggle the 'isRemoved' status in Firestore
-                                    bool currentStatus =
-                                        profileData['isRemoved'] ?? false;
-                                    await FirebaseFirestore.instance
-                                        .collection('user')
-                                        .doc(widget.userId)
-                                        .update({'isRemoved': !currentStatus});
+                                    try {
+                                      bool currentStatus =
+                                          profileData['isRemoved'] ?? false;
+                                      await FirebaseFirestore.instance
+                                          .collection('user')
+                                          .doc(widget.userId)
+                                          .update(
+                                              {'isRemoved': !currentStatus});
 
-                                    setState(
-                                        () {}); // Refresh the UI after the update
+                                      final List<String> playerIds =
+                                          List<String>.from(
+                                              profileData['onId'] ?? []);
+
+                                      if (playerIds.isNotEmpty) {
+                                        // Prepare notification details
+                                        final title = profileData['isRemoved']
+                                            ? "Account Restricted"
+                                            : "Account Reinstated";
+                                        final description = profileData[
+                                                'isRemoved']
+                                            ? "Your account has been restricted. Please contact support for more details."
+                                            : "Your account has been reinstated. You can now access all features.";
+
+                                        // Send the notification to all devices
+                                        await NotificationService()
+                                            .sentNotificationtoUser(
+                                          title: title,
+                                          description: description,
+                                          onIds: playerIds,
+                                        );
+                                      }
+
+                                      setState(() {});
+                                    } catch (e) {
+                                      print("Error updating user status: $e");
+                                    }
                                   },
                                   style: ElevatedButton.styleFrom(
                                     foregroundColor: Colors.white,
@@ -430,7 +487,6 @@ class OtherProfilePageStateForAdmin extends State<OtherProfilePageForAdmin> {
                           ],
                         ),
                         const SizedBox(width: 16),
-                        // Trip button with underline effect
                         Column(
                           children: [
                             TextButton.icon(
@@ -441,8 +497,7 @@ class OtherProfilePageStateForAdmin extends State<OtherProfilePageForAdmin> {
                               },
                               icon: const Icon(
                                 Icons.photo_album,
-                                color: Colors
-                                    .black, // Set the color of the icon to black
+                                color: Colors.black,
                               ),
                               label: const Text(
                                 'Trip Images',

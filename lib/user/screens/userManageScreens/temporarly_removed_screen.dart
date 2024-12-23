@@ -13,14 +13,13 @@ class TemporaryRemovedPopup extends StatelessWidget {
       ),
       child: Container(
         constraints: const BoxConstraints(
-          maxHeight: 300, // Set a fixed height for the popup
+          maxHeight: 300,
         ),
         child: Column(
           children: [
-            // App-bar like section
             Container(
               decoration: const BoxDecoration(
-                color: Colors.blue, // Background color for the top section
+                color: Colors.blue,
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(12),
                   topRight: Radius.circular(12),
@@ -30,24 +29,23 @@ class TemporaryRemovedPopup extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const SizedBox(), // Placeholder for alignment
+                  const SizedBox(),
                   const Text(
-                    '', // Optional: Add a title if needed
+                    '',
                     style: TextStyle(color: Colors.white, fontSize: 18),
                   ),
                   GestureDetector(
                     onTap: () {
-                      Navigator.of(context).pop(); // Close the dialog
+                      Navigator.of(context).pop();
                     },
                     child: const Padding(
-                      padding: EdgeInsets.all(8.0), // Increase tap area
+                      padding: EdgeInsets.all(8.0),
                       child: Icon(Icons.close, color: Colors.white),
                     ),
                   ),
                 ],
               ),
             ),
-            // Content of the popup
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16.0),
@@ -66,10 +64,9 @@ class TemporaryRemovedPopup extends StatelessWidget {
                       style: TextStyle(fontSize: 14),
                     ),
                     const SizedBox(height: 20),
-                    // Help button at the bottom
                     SizedBox(
-                      width: 200.0, // Set the desired width
-                      height: 50.0, // Set the desired height
+                      width: 200.0,
+                      height: 50.0,
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.push(
@@ -81,20 +78,17 @@ class TemporaryRemovedPopup extends StatelessWidget {
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              Colors.blue, // Button background color
-                          foregroundColor:
-                              Colors.white, // Text color for button
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 24.0,
                             vertical: 12.0,
-                          ), // Button padding
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30.0),
                           ),
-                          elevation: 5, // Button shadow
-                          tapTargetSize:
-                              MaterialTapTargetSize.padded, // Better tap radius
+                          elevation: 5,
+                          tapTargetSize: MaterialTapTargetSize.padded,
                         ),
                         child: const Text(
                           'Help',

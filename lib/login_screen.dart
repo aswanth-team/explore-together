@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
+
 import 'admin/screens/admin_screen.dart';
 import 'user/screens/profileScreen/settingScreen/help/help_screen.dart';
 import 'user/screens/userLoginSetup/forget_password_screen.dart';
@@ -21,7 +23,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final passwordController = TextEditingController();
   bool _isPasswordHidden = true;
 
-  String? identifierError; // To display error for identifier field
+  String? identifierError;
   String? passwordError;
   bool _isLoading = false;
 
@@ -47,6 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+/*
   void loginHandle() async {
     setState(() {
       identifierError = null;
@@ -65,7 +68,6 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = passwordController.text.trim();
 
     try {
-      // Check in admin collection
       QuerySnapshot adminSnapshot = await FirebaseFirestore.instance
           .collection('admin')
           .where('username', isEqualTo: identifier)
@@ -93,26 +95,22 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (adminSnapshot.docs.isNotEmpty) {
-        // Admin identifier found
         final adminData =
             adminSnapshot.docs.first.data() as Map<String, dynamic>;
         final adminEmail = adminData['email'];
-
-        // Authenticate with Firebase Auth
         await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: adminEmail,
           password: password,
         );
 
-        // Redirect to AdminScreen
+        if (!mounted) return;
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const AdminScreen()),
         );
         return;
       }
-
-      // Check in user collection if not found in admin
       QuerySnapshot userSnapshot = await FirebaseFirestore.instance
           .collection('user')
           .where('username', isEqualTo: identifier)
@@ -146,8 +144,147 @@ class _LoginScreenState extends State<LoginScreen> {
         });
         return;
       }
+      final userData = userSnapshot.docs.first.data() as Map<String, dynamic>;
+      final userEmail = userData['email'];
+      final isRemoved = userData['isRemoved'] ?? false;
 
-      // Retrieve email from the matched user document
+      if (isRemoved) {
+        setState(() {
+          identifierError = 'Your account has been temporarily removed.';
+          _isLoading = false;
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          showTemporaryRemovedPopup(context);
+        });
+        return;
+      }
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: userEmail,
+        password: password,
+      );
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const UserScreen()),
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        if (e.code == 'invalid-credential') {
+          passwordError = 'Incorrect password.';
+        } else if (e.code == 'user-not-found') {
+          identifierError = 'User not found. Please recheck or sign up.';
+        } else {
+          identifierError = 'Authentication failed: ${e.message}';
+        }
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        identifierError = 'An error occurred: ${e.toString()}';
+        _isLoading = false;
+      });
+    }
+  } 
+  
+  
+  
+  
+  
+    void loginHandle() async {
+    setState(() {
+      identifierError = null;
+      passwordError = null;
+      _isLoading = true;
+    });
+
+    if (!_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
+    final identifier = identifierController.text.trim();
+    final password = passwordController.text.trim();
+
+    try {
+      QuerySnapshot adminSnapshot = await FirebaseFirestore.instance
+          .collection('admin')
+          .where('username', isEqualTo: identifier)
+          .get();
+
+      if (adminSnapshot.docs.isEmpty) {
+        adminSnapshot = await FirebaseFirestore.instance
+            .collection('admin')
+            .where('email', isEqualTo: identifier)
+            .get();
+      }
+
+      if (adminSnapshot.docs.isEmpty) {
+        adminSnapshot = await FirebaseFirestore.instance
+            .collection('admin')
+            .where('phoneno', isEqualTo: identifier)
+            .get();
+      }
+
+      if (adminSnapshot.docs.isEmpty) {
+        adminSnapshot = await FirebaseFirestore.instance
+            .collection('admin')
+            .where('aadharno', isEqualTo: identifier)
+            .get();
+      }
+
+      if (adminSnapshot.docs.isNotEmpty) {
+        final adminData =
+            adminSnapshot.docs.first.data() as Map<String, dynamic>;
+        final adminEmail = adminData['email'];
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: adminEmail,
+          password: password,
+        );
+
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AdminScreen()),
+        );
+        return;
+      }
+      QuerySnapshot userSnapshot = await FirebaseFirestore.instance
+          .collection('user')
+          .where('username', isEqualTo: identifier)
+          .get();
+
+      if (userSnapshot.docs.isEmpty) {
+        userSnapshot = await FirebaseFirestore.instance
+            .collection('user')
+            .where('email', isEqualTo: identifier)
+            .get();
+      }
+
+      if (userSnapshot.docs.isEmpty) {
+        userSnapshot = await FirebaseFirestore.instance
+            .collection('user')
+            .where('phoneno', isEqualTo: identifier)
+            .get();
+      }
+
+      if (userSnapshot.docs.isEmpty) {
+        userSnapshot = await FirebaseFirestore.instance
+            .collection('user')
+            .where('aadharno', isEqualTo: identifier)
+            .get();
+      }
+
+      if (userSnapshot.docs.isEmpty) {
+        setState(() {
+          identifierError = 'User not found. Please recheck or sign up.';
+          _isLoading = false;
+        });
+        return;
+      }
       final userData = userSnapshot.docs.first.data() as Map<String, dynamic>;
       final userEmail = userData['email'];
       final isRemoved = userData['isRemoved'] ?? false;
@@ -163,16 +300,25 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      // Authenticate with Firebase Auth
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final userCredential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: userEmail,
         password: password,
       );
 
-      // Redirect to UserScreen
+      final userId = userCredential.user?.uid;
+      if (userId != null) {
+        final playerId = OneSignal.User.pushSubscription.id;
+        await FirebaseFirestore.instance
+            .collection('user')
+            .doc(userId)
+            .set({'onId': playerId}, SetOptions(merge: true));
+      }
+
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => UserScreen()),
+        MaterialPageRoute(builder: (context) => const UserScreen()),
       );
     } on FirebaseAuthException catch (e) {
       setState(() {
@@ -184,6 +330,146 @@ class _LoginScreenState extends State<LoginScreen> {
           identifierError = 'Authentication failed: ${e.message}';
         }
 
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        identifierError = 'An error occurred: ${e.toString()}';
+        _isLoading = false;
+      });
+    }
+  }*/
+
+  void loginHandle() async {
+    setState(() {
+      identifierError = null;
+      passwordError = null;
+      _isLoading = true;
+    });
+
+    if (!_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
+    final identifier = identifierController.text.trim();
+    final password = passwordController.text.trim();
+
+    try {
+      QuerySnapshot? userSnapshot;
+      Map<String, dynamic>? userData;
+      String? userEmail;
+      bool isAdmin = false;
+
+      for (final field in ['username', 'email', 'phoneno', 'aadharno']) {
+        final adminQuery = await FirebaseFirestore.instance
+            .collection('admin')
+            .where(field, isEqualTo: identifier)
+            .get();
+
+        if (adminQuery.docs.isNotEmpty) {
+          isAdmin = true;
+          userSnapshot = adminQuery;
+          break;
+        }
+
+        final userQuery = await FirebaseFirestore.instance
+            .collection('user')
+            .where(field, isEqualTo: identifier)
+            .get();
+
+        if (userQuery.docs.isNotEmpty) {
+          userSnapshot = userQuery;
+          break;
+        }
+      }
+
+      if (userSnapshot == null || userSnapshot.docs.isEmpty) {
+        setState(() {
+          identifierError = 'User not found. Please recheck or sign up.';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      userData = userSnapshot.docs.first.data() as Map<String, dynamic>;
+      userEmail = userData['email'];
+
+      if (!isAdmin && (userData['isRemoved'] ?? false)) {
+        setState(() {
+          identifierError = 'Your account has been temporarily removed.';
+          _isLoading = false;
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          showTemporaryRemovedPopup(context);
+        });
+        return;
+      }
+
+      final userCredential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: userEmail!,
+        password: password,
+      );
+
+      // final userId = userCredential.user?.uid;
+      //  if (userId != null) {
+      //    final playerId = OneSignal.User.pushSubscription.id;
+      //     await FirebaseFirestore.instance
+      //          .collection('user')
+      //          .doc(userId)
+      //          .set({'onId': playerId}, SetOptions(merge: true));
+      //    }
+
+      final userId = userCredential.user?.uid;
+      if (!isAdmin && userId != null) {
+        final playerId = OneSignal.User.pushSubscription.id;
+
+        // Get the document for the user
+        final userDocRef =
+            FirebaseFirestore.instance.collection('user').doc(userId);
+        final userDocSnapshot = await userDocRef.get();
+
+        // Check if the 'onId' field exists and if it's a list, otherwise initialize an empty list
+        List<String> existingPlayerIds = [];
+        if (userDocSnapshot.exists) {
+          final userData = userDocSnapshot.data();
+          existingPlayerIds = List<String>.from(userData?['onId'] ?? []);
+        }
+
+        // Add the new playerId to the list if it's not already present
+        if (!existingPlayerIds.contains(playerId)) {
+          existingPlayerIds.add(playerId!);
+        }
+
+        // Update the user document with the new 'onId' list
+        await userDocRef
+            .set({'onId': existingPlayerIds}, SetOptions(merge: true));
+      }
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              isAdmin ? const AdminScreen() : const UserScreen(),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        switch (e.code) {
+          case 'invalid-credential':
+            passwordError = 'Incorrect password.';
+            break;
+          case 'user-not-found':
+            identifierError = 'User not found. Please recheck or sign up.';
+            break;
+          default:
+            identifierError = 'Authentication failed: ${e.message}';
+        }
         _isLoading = false;
       });
     } catch (e) {
@@ -214,22 +500,22 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Container(
               decoration: const BoxDecoration(
                 image: DecorationImage(
-                  image: AssetImage('assets/defaults/login.png'),
+                  image: AssetImage('assets/system/bg/login.png'),
                   fit: BoxFit.cover,
                 ),
               ),
             ),
           ),
           Positioned(
-            top: 16.0, 
-            right: 16.0, 
+            top: 16.0,
+            right: 16.0,
             child: IconButton(
-              icon: Icon(Icons.help_outline, color: Colors.white),
+              icon: const Icon(Icons.help_outline, color: Colors.white),
               tooltip: 'Help',
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => MainHelpPage()),
+                  MaterialPageRoute(builder: (context) => const MainHelpPage()),
                 );
               },
             ),
@@ -244,7 +530,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     // Header
                     Stack(
                       children: [
-                        // Border Text
                         Text(
                           'Explore Together',
                           textAlign: TextAlign.center,
@@ -257,7 +542,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               ..color = Colors.white,
                           ),
                         ),
-                        // Main Text
                         Text(
                           'Explore Together',
                           textAlign: TextAlign.center,
@@ -302,7 +586,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           const SizedBox(height: 5),
                           SizedBox(
-                            width: 350, // Set width for the DOB field
+                            width: 350,
                             child: TextFormField(
                               controller: identifierController,
                               decoration: _inputDecoration(
@@ -320,7 +604,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 20),
                           SizedBox(
-                            width: 350, // Set width for the DOB field
+                            width: 350,
                             child: TextFormField(
                               controller: passwordController,
                               obscureText: _isPasswordHidden,
@@ -362,7 +646,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) =>
-                                        ForgetPasswordScreen(),
+                                        const ForgetPasswordScreen(),
                                   ),
                                 );
                               },
@@ -406,7 +690,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => RegistrationScreen(),
+                                  builder: (context) =>
+                                      const RegistrationScreen(),
                                 ),
                               );
                             },

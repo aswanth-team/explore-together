@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../../../utils/loading.dart';
 import 'chat_utils.dart';
 import 'chating_screen.dart';
@@ -16,82 +18,75 @@ class ChatHomeScreenState extends State<ChatHomeScreen>
     with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
   final String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
-  final ChatCacheManager _cacheManager = ChatCacheManager();
-
-  List<Map<String, dynamic>> previousChats = [];
-  bool isLoading = true;
-  String? errorMessage;
+  bool isOffline = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initializeData();
     UserStatusManager.updateUserStatus(true);
+    _checkConnectivity();
   }
 
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _searchController.dispose();
-    UserStatusManager.updateUserStatus(false);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    switch (state) {
-      case AppLifecycleState.resumed:
-        UserStatusManager.updateUserStatus(true);
-        break;
-      case AppLifecycleState.paused:
-      case AppLifecycleState.inactive:
-      case AppLifecycleState.detached:
-        UserStatusManager.updateUserStatus(false);
-        break;
-      case AppLifecycleState.hidden:
-        // TODO: Handle this case.
-        break;
-    }
-  }
-
-  Future<void> _initializeData() async {
-    await _cacheManager.initDatabase();
-
+  Future<int> _getUnreadMessageCount(
+      String chatRoomId, String otherUserId) async {
     try {
-      // First, load cached chats
-      final cachedChats = await PreferencesManager.loadChats();
-      if (cachedChats.isNotEmpty) {
-        setState(() {
-          previousChats = cachedChats;
-          isLoading = false;
-        });
-      }
-
-      // Then fetch fresh data from Firestore
-      await _loadPreviousChats();
-    } catch (error) {
-      setState(() {
-        isLoading = false;
-        errorMessage = "Error loading chats. Please check your connection.";
-      });
-    }
-  }
-
-  Future<void> _loadPreviousChats() async {
-    setState(() {
-      isLoading = true;
-      errorMessage = null;
-    });
-
-    try {
-      final chatSnapshots = await FirebaseFirestore.instance
-          .collection('chat')
-          .where('user', arrayContains: currentUserId)
-          .limit(20) // Limit initial load
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('chat/$chatRoomId/messages')
+          .where('senderId', isEqualTo: otherUserId)
+          .where('isSeen', isEqualTo: false)
           .get();
 
-      final userFutures = chatSnapshots.docs.map((chatDoc) async {
+      return querySnapshot.docs.length;
+    } catch (e) {
+      print('Error getting unread message count: $e');
+      return 0;
+    }
+  }
+
+  Future<void> _checkConnectivity() async {
+    try {
+      await FirebaseFirestore.instance.runTransaction((transaction) async {});
+      setState(() => isOffline = false);
+    } catch (e) {
+      setState(() => isOffline = true);
+    }
+  }
+
+  Future<void> _saveChatsToCache(List<Map<String, dynamic>> chats) async {
+    final prefs = await SharedPreferences.getInstance();
+    final chatJson = json.encode(chats.map((chat) {
+      return {
+        ...chat,
+        'latestMessageTime': chat['latestMessageTime'].toIso8601String(),
+      };
+    }).toList());
+    await prefs.setString('cached_chats', chatJson);
+  }
+
+  Future<List<Map<String, dynamic>>> _loadChatsFromCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    final chatJson = prefs.getString('cached_chats');
+    if (chatJson != null) {
+      final List<dynamic> decodedChats = json.decode(chatJson);
+      return decodedChats.map((chat) {
+        return {
+          ...Map<String, dynamic>.from(chat),
+          'latestMessageTime': DateTime.parse(chat['latestMessageTime']),
+        };
+      }).toList();
+    }
+    return [];
+  }
+
+  Stream<List<Map<String, dynamic>>> getChatStream() {
+    return FirebaseFirestore.instance
+        .collection('chat')
+        .where('user', arrayContains: currentUserId)
+        .limit(20)
+        .snapshots()
+        .asyncMap((chatSnapshot) async {
+      final chatFutures = chatSnapshot.docs.map((chatDoc) async {
         final chatData = chatDoc.data();
         final userIds = chatData['user'] as List<dynamic>? ?? [];
         final otherUserId = userIds.firstWhere(
@@ -109,12 +104,13 @@ class ChatHomeScreenState extends State<ChatHomeScreen>
         if (userSnapshot.exists) {
           final userData = userSnapshot.data();
 
-          // Calculate unread messages from the opposite user
-          final unseenCount = await _cacheManager.getUnseenMessageCount(
+          final unreadCount = await _getUnreadMessageCount(
             chatDoc.id,
-            senderId:
-                otherUserId, // Pass the other user's ID to filter their messages
+            otherUserId,
           );
+
+          final latestMessageTime =
+              chatData['latestMessageTime']?.toDate() ?? DateTime.now();
 
           return {
             'userId': otherUserId,
@@ -123,131 +119,225 @@ class ChatHomeScreenState extends State<ChatHomeScreen>
             'userimage':
                 userData?['userimage'] ?? 'https://via.placeholder.com/150',
             'latestMessage': chatData['latestMessage'] ?? 'No messages yet',
-            'unseenCount': unseenCount
+            'unseenCount': unreadCount,
+            'latestMessageTime': latestMessageTime,
           };
         }
         return null;
       });
 
-      final chatList = await Future.wait(userFutures);
+      final chatList = await Future.wait(chatFutures);
       final validChats = chatList.whereType<Map<String, dynamic>>().toList();
 
-      setState(() {
-        previousChats = validChats;
-        isLoading = false;
+      validChats.sort((a, b) {
+        final timeA = a['latestMessageTime'] as DateTime;
+        final timeB = b['latestMessageTime'] as DateTime;
+        return timeB.compareTo(timeA);
       });
 
-      // Save to local storage
-      await PreferencesManager.saveChats(validChats);
-    } catch (error) {
-      setState(() {
-        isLoading = false;
-        errorMessage = "Error loading chats. Please try again.";
-      });
-      debugPrint("Error loading chats: $error");
+      // Save to cache whenever we get new data
+      await _saveChatsToCache(validChats);
+      return validChats;
+    });
+  }
+
+  Widget _buildChatList(List<Map<String, dynamic>> chats) {
+    final searchQuery = _searchController.text.toLowerCase();
+    final filteredChats = chats.where((chat) {
+      return chat['username'].toString().toLowerCase().contains(searchQuery);
+    }).toList();
+
+    if (filteredChats.isEmpty) {
+      return Center(
+        child: Text(
+          _searchController.text.isEmpty
+              ? 'No chats found.'
+              : 'No chats matching "${_searchController.text}".',
+          textAlign: TextAlign.center,
+        ),
+      );
     }
+
+    return GridView.builder(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 1,
+        childAspectRatio: 4.3,
+      ),
+      itemCount: filteredChats.length,
+      itemBuilder: (context, index) {
+        final chat = filteredChats[index];
+        return Card(
+          child: ListTile(
+            leading: Stack(
+              children: [
+                CircleAvatar(
+                  child: OptimizedNetworkImage(
+                    imageUrl: chat['userimage'],
+                    width: 50,
+                    height: 50,
+                  ),
+                ),
+                if (chat['unseenCount'] > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        '${chat['unseenCount']}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            title: Text(chat['username']),
+            subtitle: Text(
+              chat['latestMessage'],
+              overflow: TextOverflow.ellipsis,
+            ),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatScreen(
+                  currentUserId: currentUserId,
+                  chatUserId: chat['userId'],
+                  chatRoomId: chat['chatRoomId'],
+                  onMessageSent: () {},
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final searchQuery = _searchController.text.toLowerCase();
-    final filteredChats = previousChats.where((chat) {
-      return chat['username'].toLowerCase().contains(searchQuery);
-    }).toList();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chats'),
+        actions: [
+          if (isOffline)
+            const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Icon(Icons.offline_bolt, color: Colors.orange),
+            ),
+        ],
       ),
-      body: isLoading
-          ? const Center(child: LoadingAnimation())
-          : errorMessage != null
-              ? Center(child: Text(errorMessage!))
-              : Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: const InputDecoration(
-                          hintText: 'Search',
-                          prefixIcon: Icon(Icons.search),
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (value) => setState(() {}),
-                      ),
-                    ),
-                    Expanded(
-                      child: filteredChats.isEmpty
-                          ? Center(
-                              child: Text(
-                                _searchController.text.isEmpty
-                                    ? 'No chats found.'
-                                    : 'No chats matching "${_searchController.text}".',
-                                textAlign: TextAlign.center,
-                              ),
-                            )
-                          : GridView.builder(
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 1,
-                                childAspectRatio: 4.3,
-                              ),
-                              itemCount: filteredChats.length,
-                              itemBuilder: (context, index) {
-                                final chat = filteredChats[index];
-                                return Card(
-                                  child: ListTile(
-                                    leading: Stack(
-                                      children: [
-                                        OptimizedNetworkImage(
-                                          imageUrl: chat['userimage'],
-                                          width: 50,
-                                          height: 50,
-                                        ),
-                                        if (chat['unseenCount'] > 0)
-                                          Positioned(
-                                            right: 0,
-                                            top: 0,
-                                            child: Container(
-                                              padding: const EdgeInsets.all(4),
-                                              decoration: const BoxDecoration(
-                                                color: Colors.red,
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: Text(
-                                                '${chat['unseenCount']}',
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 10,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                    title: Text(chat['username']),
-                                    subtitle: Text(
-                                      chat['latestMessage'],
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => ChatScreen(
-                                          currentUserId: currentUserId,
-                                          chatUserId: chat['userId'],
-                                          chatRoomId: chat['chatRoomId'],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search',
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: Colors.grey[600],
                 ),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(
+                          Icons.clear,
+                          color: Colors.grey[600],
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                          });
+                        },
+                      )
+                    : null,
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: const BorderSide(color: Colors.blue, width: 2),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: const BorderSide(color: Colors.blue, width: 2),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: const BorderSide(color: Colors.grey, width: 1),
+                ),
+              ),
+              onChanged: (value) => setState(() {}),
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              stream: getChatStream(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  // If there's an error with the stream, load from cache
+                  return FutureBuilder<List<Map<String, dynamic>>>(
+                    future: _loadChatsFromCache(),
+                    builder: (context, cacheSnapshot) {
+                      if (cacheSnapshot.hasData) {
+                        return _buildChatList(cacheSnapshot.data!);
+                      }
+                      return const Center(
+                          child: Text('No cached chats available'));
+                    },
+                  );
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  // While waiting for the stream, show cached data
+                  return FutureBuilder<List<Map<String, dynamic>>>(
+                    future: _loadChatsFromCache(),
+                    builder: (context, cacheSnapshot) {
+                      if (cacheSnapshot.hasData) {
+                        return _buildChatList(cacheSnapshot.data!);
+                      }
+                      return const Center(child: LoadingAnimation());
+                    },
+                  );
+                }
+
+                return _buildChatList(snapshot.data ?? []);
+              },
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _searchController.dispose();
+    UserStatusManager.updateUserStatus(false);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        UserStatusManager.updateUserStatus(true);
+        _checkConnectivity();
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+        UserStatusManager.updateUserStatus(false);
+        break;
+      case AppLifecycleState.hidden:
+        break;
+    }
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../services/one_signal.dart';
 import '../../../services/user/user_services.dart';
 import '../../../utils/loading.dart';
 import 'user_profile_view_screen.dart';
@@ -40,8 +41,33 @@ class UserSearchPageState extends State<UserSearchPage> {
   }
 
   Future<void> updateUserStatus(String userId, bool isRemoved) async {
-    userService.updateUserRemovalStatus(userId: userId, isRemoved: isRemoved);
-    setState(() {});
+    try {
+      userService.updateUserRemovalStatus(userId: userId, isRemoved: isRemoved);
+      // Fetch the user's notification player IDs (ensure playerIds is a list of strings)
+      final user = await UserService().fetchUserDetails(
+          userId: userId); // Assuming this fetches user details by ID
+      final List<String> playerIds = List<String>.from(user['onId'] ?? []);
+
+      if (playerIds.isNotEmpty) {
+        // Prepare notification details
+        final title = isRemoved ? "Account Restricted" : "Account Reinstated";
+        final description = isRemoved
+            ? "Your account has been restricted. Please contact support for more details."
+            : "Your account has been reinstated. You can now access all features.";
+
+        // Send the notification to all devices
+        await NotificationService().sentNotificationtoUser(
+          title: title,
+          description: description,
+          onIds: playerIds,
+        );
+      }
+
+      // Update the UI
+      setState(() {});
+    } catch (e) {
+      print("Error updating user status: $e");
+    }
   }
 
   @override
@@ -111,6 +137,7 @@ class UserSearchPageState extends State<UserSearchPage> {
 
                 final filteredUsers = snapshot.data!;
                 return GridView.builder(
+                  padding: EdgeInsets.zero,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 1,
                     childAspectRatio: 5,
@@ -129,13 +156,8 @@ class UserSearchPageState extends State<UserSearchPage> {
                         );
                       },
                       child: Card(
+                        margin: EdgeInsets.zero,
                         elevation: 5,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        shadowColor: user['isRemoved']
-                            ? Colors.red.shade300.withOpacity(0.5)
-                            : Colors.blue.shade100.withOpacity(0.5),
                         color: user['isRemoved']
                             ? Colors.red.shade100
                             : Colors.white,

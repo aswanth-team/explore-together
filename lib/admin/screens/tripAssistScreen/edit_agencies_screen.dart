@@ -35,8 +35,6 @@ class EditAgencyPageState extends State<EditAgencyPage> {
     _keywordsController = TextEditingController();
     _categoryController =
         TextEditingController(text: widget.agency['category']);
-
-    // Initialize the _keywords list with existing keywords from the agency
     _keywords = List<String>.from(widget.agency['agencyKeywords'] ?? []);
   }
 

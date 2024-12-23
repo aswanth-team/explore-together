@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
-
 import '../../../login_screen.dart';
 
 void main() {
-  runApp(MaterialApp(
+  runApp(const MaterialApp(
     home: GetStartedPage(),
     debugShowCheckedModeBanner: false,
   ));
@@ -21,32 +20,32 @@ class _GetStartedPageState extends State<GetStartedPage> {
   final PageController _pageController = PageController();
   final List<Map<String, String>> setupFrames = [
     {
-      "animation": "assets/LottieAnimations/welcome.json",
+      "animation": "assets/system/animation/greet/welcome.json",
       "heading": "Welcome!",
       "description": "Get ready for an amazing journey with us."
     },
     {
-      "animation": "assets/LottieAnimations/posttrip.json",
+      "animation": "assets/system/animation/greet/posttrip.json",
       "heading": "Share Your Trip",
       "description": "Let others know about your travel experiences."
     },
     {
-      "animation": "assets/LottieAnimations/find.json",
+      "animation": "assets/system/animation/greet/find.json",
       "heading": "Find a Buddy",
       "description": "Connect with others and explore together."
     },
     {
-      "animation": "assets/LottieAnimations/plan.json",
+      "animation": "assets/system/animation/greet/plan.json",
       "heading": "Plan Your Trip",
       "description": "Organize your journey with ease and confidence."
     },
     {
-      "animation": "assets/LottieAnimations/enjoy.json",
+      "animation": "assets/system/animation/greet/enjoy.json",
       "heading": "Enjoy the Adventure",
       "description": "Make the most of your trip and create lasting memories."
     },
     {
-      "animation": "assets/LottieAnimations/postmemory.json",
+      "animation": "assets/system/animation/greet/postmemory.json",
       "heading": "Share Memories",
       "description": "Capture and share the highlights of your journey."
     }

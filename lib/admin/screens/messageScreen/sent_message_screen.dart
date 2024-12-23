@@ -1,25 +1,51 @@
-import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../../services/cloudinary_upload.dart';
+import '../../../services/one_signal.dart';
 
 class SentMessagePage extends StatefulWidget {
   final String? userNameFromPreviousPage;
   final bool disableSendToAll;
-
-  // Constructor to accept userName and disable flag
-  SentMessagePage(
-      {this.userNameFromPreviousPage, this.disableSendToAll = false});
+  const SentMessagePage(
+      {super.key,
+      this.userNameFromPreviousPage,
+      this.disableSendToAll = false});
 
   @override
-  _SentMessagePageState createState() => _SentMessagePageState();
+  SentMessagePageState createState() => SentMessagePageState();
 }
 
-class _SentMessagePageState extends State<SentMessagePage> {
-  TextEditingController _messageController = TextEditingController();
+class SentMessagePageState extends State<SentMessagePage> {
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _messageController = TextEditingController();
   String selectedUserName = '';
   bool sendToAll = true;
+  bool isLoading = false;
+  File? _selectedImage;
 
-  get http => null;
+  final CloudinaryService cloudinaryService = CloudinaryService(
+    uploadPreset: 'notificationImages',
+  );
+
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        _selectedImage = File(image.path);
+      });
+    }
+  }
+
+  Future<String?> _uploadImage() async {
+    if (_selectedImage != null) {
+      return await cloudinaryService.uploadImage(selectedImage: _selectedImage);
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -36,15 +62,14 @@ class _SentMessagePageState extends State<SentMessagePage> {
     String message = _messageController.text.trim();
 
     if (message.isEmpty) {
-      // Show an error message if the message is empty
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Message cannot be empty')),
+        const SnackBar(content: Text('Message cannot be empty')),
       );
       return false;
     }
     if (!sendToAll && selectedUserName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('enter the userName')),
+        const SnackBar(content: Text('enter the userName')),
       );
       return false;
     }
@@ -57,43 +82,126 @@ class _SentMessagePageState extends State<SentMessagePage> {
     if (!validateInput()) {
       return;
     }
+    String title = _titleController.text;
     String message = _messageController.text;
-    if (sendToAll) {
-      FirebaseFirestore.instance
-          .collection('user_userName')
-          .get()
-          .then((snapshot) {
-        snapshot.docs.forEach((doc) {
-          String userName = doc['userName'];
-          sendFCMNotification(userName, message);
+
+    setState(() {
+      isLoading = true;
+    });
+
+    _titleController.clear();
+    _messageController.clear();
+
+    String? imageUrl;
+
+    if (_selectedImage != null) {
+      imageUrl = await _uploadImage();
+      if (imageUrl == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to upload image')),
+        );
+        setState(() {
+          isLoading = false;
         });
-      });
-    } else {
-      sendFCMNotification(selectedUserName, message);
+        return;
+      }
     }
-  }
 
-  // Function to send FCM notification
-  Future<void> sendFCMNotification(String userName, String message) async {
-    var response = await http.post(
-      Uri.parse('https://fcm.googleapis.com/fcm/send'),
-      headers: <String, String>{
-        'Content-Type': 'application/json',
-        'Authorization': 'key=YOUR_SERVER_KEY_HERE',
-      },
-      body: jsonEncode({
-        "to": userName,
-        "notification": {
-          "title": "Admin Message",
-          "body": message,
+    try {
+      if (sendToAll) {
+        await NotificationService().sendNotificationToAllUsers(
+          title,
+          message,
+          imageUrl,
+        );
+        final userCollection = FirebaseFirestore.instance.collection('user');
+        final querySnapshot = await userCollection.get();
+
+        if (querySnapshot.docs.isNotEmpty) {
+          for (var userDoc in querySnapshot.docs) {
+            final userDocId = userDoc.id;
+            final notificationData = {
+              'title': title,
+              'message': message,
+              'time': FieldValue.serverTimestamp(),
+              'date': DateTime.now().toIso8601String(),
+              'isSeen': false,
+            };
+
+            await userCollection
+                .doc(userDocId)
+                .collection('notifications')
+                .add(notificationData);
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Notification sent to all users')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No users found')),
+          );
         }
-      }),
-    );
+      } else {
+        final userCollection = FirebaseFirestore.instance.collection('user');
+        final querySnapshot = await userCollection
+            .where('username', isEqualTo: selectedUserName)
+            .get();
 
-    if (response.statusCode == 200) {
-      print('Notification sent successfully');
-    } else {
-      print('Failed to send notification');
+        if (querySnapshot.docs.isNotEmpty) {
+          // Access the first document in the result (assuming 'username' is unique)
+          final userDoc = querySnapshot.docs.first;
+
+          // Extract the 'onId' field
+          final onId = userDoc.data()['onId'];
+
+          print('onId: $onId');
+        } else {
+          print('No user found with username: $selectedUserName');
+        }
+
+        if (querySnapshot.docs.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Username does not exist')),
+          );
+          return;
+        }
+
+        final userDoc = querySnapshot.docs.first;
+        final userDocId = userDoc.id;
+        final userData = userDoc.data();
+        List<String> onIds = [];
+        if (userData.containsKey('onId') && userData['onId'] is List) {
+          onIds = List<String>.from(userData['onId']);
+        }
+        final notificationData = {
+          'title': title,
+          'message': message,
+          'time': FieldValue.serverTimestamp(),
+          'date': DateTime.now().toIso8601String(),
+          'isSeen': false,
+        };
+
+        await userCollection
+            .doc(userDocId)
+            .collection('notifications')
+            .add(notificationData);
+
+        await NotificationService().sentNotificationtoUser(
+            title: title, description: message, onIds: onIds);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Notification sent to user')),
+        );
+      }
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to send notification')),
+      );
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
@@ -101,7 +209,7 @@ class _SentMessagePageState extends State<SentMessagePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Admin Notification Page'),
+        title: const Text('Notification Page'),
         backgroundColor: Colors.blueAccent,
       ),
       body: Padding(
@@ -110,7 +218,7 @@ class _SentMessagePageState extends State<SentMessagePage> {
           children: [
             // Switch for sending to all users
             SwitchListTile(
-              title: Text(
+              title: const Text(
                 'Send to all users',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
               ),
@@ -134,15 +242,14 @@ class _SentMessagePageState extends State<SentMessagePage> {
                       selectedUserName = value;
                     });
                   },
-                  initialValue:
-                      selectedUserName, // Automatically set value if passed
+                  initialValue: selectedUserName,
                   decoration: InputDecoration(
                     labelText: 'Enter Username',
                     labelStyle: TextStyle(color: Colors.blueAccent),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12.0),
                     ),
-                    prefixIcon: Icon(
+                    prefixIcon: const Icon(
                       Icons.person_outline,
                       color: Colors.blueAccent,
                     ),
@@ -150,7 +257,28 @@ class _SentMessagePageState extends State<SentMessagePage> {
                 ),
               ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
+
+            TextFormField(
+              controller: _titleController,
+              maxLines: null,
+              keyboardType: TextInputType.multiline,
+              decoration: InputDecoration(
+                labelText: 'Enter title',
+                labelStyle: const TextStyle(color: Colors.blueAccent),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                prefixIcon: const Icon(
+                  Icons.message,
+                  color: Colors.blueAccent,
+                ),
+              ),
+            ),
+
+            const SizedBox(
+              height: 10,
+            ),
 
             // Message input field
             TextFormField(
@@ -158,12 +286,12 @@ class _SentMessagePageState extends State<SentMessagePage> {
               maxLines: null, // This makes the TextField multi-line
               keyboardType: TextInputType.multiline,
               decoration: InputDecoration(
-                labelText: 'Enter your message',
-                labelStyle: TextStyle(color: Colors.blueAccent),
+                labelText: 'Enter message',
+                labelStyle: const TextStyle(color: Colors.blueAccent),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12.0),
                 ),
-                prefixIcon: Icon(
+                prefixIcon: const Icon(
                   Icons.message,
                   color: Colors.blueAccent,
                 ),
@@ -174,17 +302,42 @@ class _SentMessagePageState extends State<SentMessagePage> {
 
             // Send notification button
             ElevatedButton(
-              onPressed: sendNotification,
+              onPressed: isLoading
+                  ? null
+                  : sendNotification, // Disable button when loading
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blueAccent,
-                padding: EdgeInsets.symmetric(vertical: 16),
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12.0),
                 ),
-                textStyle: TextStyle(fontSize: 18),
+                textStyle: const TextStyle(fontSize: 18),
               ),
-              child: Text('Send Notification'),
+              child: isLoading
+                  ? const CircularProgressIndicator(
+                      color: Colors.white,
+                    )
+                  : const Text('Send Notification'),
             ),
+            const SizedBox(height: 20),
+            if (sendToAll)
+              Column(
+                children: [
+                  if (_selectedImage != null)
+                    Image.file(
+                      _selectedImage!,
+                      height: 150,
+                      width: 150,
+                      fit: BoxFit.cover,
+                    ),
+                  ElevatedButton.icon(
+                    onPressed: _pickImage,
+                    icon: const Icon(Icons.image),
+                    label: const Text("Upload Image"),
+                  ),
+                ],
+              ),
+            const SizedBox(height: 20),
           ],
         ),
       ),

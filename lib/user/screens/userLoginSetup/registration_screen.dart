@@ -46,7 +46,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         color: Colors.white,
         fontWeight: FontWeight.bold,
       ),
-      //  floatingLabelBehavior: FloatingLabelBehavior.never,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: const BorderSide(color: Colors.white, width: 2),
@@ -145,20 +144,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
   }
 
-  void _previousStep() {
-    setState(() {
-      _step--;
-    });
-  }
-
-  // Generate a random OTP
   String _generateOtp() {
     //final random = Random();
-    //return (random.nextInt(900000) + 100000).toString(); // 6-digit OTP
+    //return (random.nextInt(900000) + 100000).toString();
     return '777777';
   }
 
-  // Simulate sending OTP (Replace this with actual SMS API integration)
   Future<void> _sendOtp(String mobileNumber) async {
     setState(() {
       generatedOtp = _generateOtp(); // Generate OTP
@@ -171,14 +162,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   Future<void> _storeUserDetails() async {
-    print("Full Name: ${fullNameController.text}");
-    print("Gender: $_gender");
-    print("DOB: ${dobController.text}");
-    print("Location: ${locationController.text}");
-    print("Username: ${usernameController.text}");
-    print("Mobile Number: ${mobileNumberController.text}");
-    print("Email: ${emailController.text}");
-    print("Password: ${passwordController.text}");
     String genderController = _gender.toString();
     try {
       await UserAuthServices().userRegisterInFirebase(
@@ -201,8 +184,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   @override
   void initState() {
     super.initState();
-
-    // Attach listeners to clear error messages when the user types
     usernameController.addListener(() {
       setState(() {
         if (usernameController.text.isNotEmpty) {
@@ -257,7 +238,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             child: Container(
               decoration: const BoxDecoration(
                 image: DecorationImage(
-                  image: AssetImage('assets/defaults/registration.png'),
+                  image: AssetImage('assets/system/bg/registration.png'),
                   fit: BoxFit.cover,
                 ),
               ),
@@ -434,7 +415,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
-  // Build Step 2 - Additional details
   Widget _buildStep2() {
     return Column(
       children: [
@@ -448,7 +428,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               if (value == null || value.isEmpty) {
                 return "Please enter your username";
               }
-              return usernameError; // Return the dynamic error
+              return usernameError;
             },
           ),
         ),
@@ -494,7 +474,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               if (value == null || value.isEmpty) {
                 return "Please enter your mobile number";
               }
-              return mobileError; // Return the dynamic error
+              return mobileError;
             },
           ),
         ),
@@ -517,7 +497,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               if (value == null || value.isEmpty) {
                 return "Please enter your email";
               }
-              return emailError; // Return the dynamic error
+              return emailError;
             },
           ),
         ),
@@ -531,7 +511,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           ),
         const SizedBox(height: 20),
         SizedBox(
-          width: 350, // Set the desired width
+          width: 350,
           child: TextFormField(
             controller: passwordController,
             style: const TextStyle(color: Colors.white),
@@ -552,7 +532,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         ),
         const SizedBox(height: 20),
         SizedBox(
-          width: 350, // Set the desired width
+          width: 350,
           child: TextFormField(
             controller: confirmPasswordController,
             style: const TextStyle(color: Colors.white),
@@ -608,8 +588,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                           mobileError = null;
                           emailError = null;
                         });
-
-                        // Simulate checking conflicts
                         List<String> conflicts =
                             await UserAuthServices().checkIfUserExists(
                           username: usernameController.text,
@@ -620,7 +598,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
                         if (conflicts.isNotEmpty) {
                           setState(() {
-                            // Update errors based on conflicts
                             if (conflicts.contains("Username")) {
                               usernameError = "This username is already taken";
                             }
@@ -637,10 +614,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                             }
                             _isLoading = false;
                           });
-                          return; // Stop further processing
+                          return;
                         }
-
-                        // If no conflicts, proceed to next step
                         await _sendOtp(mobileNumberController.text);
                         setState(() {
                           _isLoading = false;
@@ -666,7 +641,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
-  // Build Step 3 - OTP Verification
   Widget _buildStep3() {
     return Column(
       children: [
@@ -679,7 +653,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           ),
         ),
         const SizedBox(height: 20),
-        // Edit icon to go back to registration step
         Align(
           alignment: Alignment.topRight,
           child: IconButton(
@@ -727,11 +700,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               : () async {
                   if (otp == generatedOtp) {
                     setState(() {
-                      _isVerifyLoading = true; // Show loading indicator
+                      _isVerifyLoading = true;
                     });
 
                     try {
-                      await _storeUserDetails(); // Store user details
+                      await _storeUserDetails();
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
@@ -743,8 +716,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       );
                     } finally {
                       setState(() {
-                        _isVerifyLoading =
-                            false; // Hide loading animation once operation completes
+                        _isVerifyLoading = false;
                       });
                     }
                   } else {
@@ -768,11 +740,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         ElevatedButton(
           onPressed: _start == 0
               ? () {
-                  // Logic to resend OTP
                   startTimer();
-                  setState(() {
-                    // Reset OTP and resend
-                  });
+                  setState(() {});
                 }
               : null,
           style: ElevatedButton.styleFrom(
@@ -792,11 +761,4 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       ],
     );
   }
-}
-
-void main() {
-  runApp(const MaterialApp(
-    home: RegistrationScreen(),
-    debugShowCheckedModeBanner: false,
-  ));
 }

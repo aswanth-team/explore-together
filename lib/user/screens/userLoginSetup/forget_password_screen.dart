@@ -36,37 +36,42 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
       final foundUserId = await _authServices.checkUserExistence(identifier);
 
       if (foundUserId != null) {
-        // Retrieve the email associated with the user ID
         final userEmail = await _authServices.getUserEmailById(foundUserId);
 
         if (userEmail != null) {
-          // Send password reset email
           await _firebaseAuth.sendPasswordResetEmail(email: userEmail);
 
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text(
-                'Reset link sent. Check your email to reset your password.'),
-            backgroundColor: Colors.green,
-          ));
-
-          Navigator.of(context).pop(); // Pop back to the previous screen
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text(
+                  'Reset link sent. Check your email to reset your password.'),
+              backgroundColor: Colors.green,
+            ));
+            Navigator.of(context).pop();
+          }
         } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Error: Could not retrieve user email.'),
+              backgroundColor: Colors.red,
+            ));
+          }
+        }
+      } else {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Error: Could not retrieve user email.'),
+            content: Text('User not found. Please try again.'),
             backgroundColor: Colors.red,
           ));
         }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('User not found. Please try again.'),
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: ${e.toString()}'),
           backgroundColor: Colors.red,
         ));
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Error: ${e.toString()}'),
-        backgroundColor: Colors.red,
-      ));
     } finally {
       setState(() {
         isLoadingCheckUser = false;
@@ -81,7 +86,6 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
         color: Colors.white,
         fontWeight: FontWeight.bold,
       ),
-      //floatingLabelBehavior: FloatingLabelBehavior.never,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: const BorderSide(color: Colors.white, width: 2),
@@ -102,7 +106,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
       body: Stack(
         children: [
           Image.asset(
-            'assets/defaults/registration.png',
+            'assets/system/bg/registration.png',
             fit: BoxFit.cover,
             width: double.infinity,
             height: double.infinity,

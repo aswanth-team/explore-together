@@ -4,29 +4,26 @@ import 'package:flutter/material.dart';
 import '../../login_screen.dart';
 
 import 'homeScreen/home_screen.dart';
-import 'tripAssistScreen/travel_guide_screen.dart'; // Import PostPage
-import 'userSearchScreen/user_search_screen.dart'; // Import SearchPage// Import HomePage
+import 'tripAssistScreen/travel_guide_screen.dart';
+import 'userManageScreens/temporarly_removed_screen.dart';
+import 'userSearchScreen/user_search_screen.dart';
 import 'chatScreen/chat_screen.dart' as chat;
 import 'profileScreen/profile_screen.dart' as profile;
 
 class UserScreen extends StatefulWidget {
-  final int initialIndex; // Add a parameter to accept initial index
-
-  // Constructor to receive the initial index
-  UserScreen({this.initialIndex = 2}); // Default to Home tab (index 2)
+  final int initialIndex;
+  const UserScreen({super.key, this.initialIndex = 2});
 
   @override
-  _UserScreenState createState() => _UserScreenState();
+  UserScreenState createState() => UserScreenState();
 }
 
-class _UserScreenState extends State<UserScreen> {
+class UserScreenState extends State<UserScreen> {
   late int _selectedIndex;
-
-  // List of pages corresponding to each tab
   final List<Widget> _pages = [
     const TravelAgencyPage(),
     const SearchPage(),
-    HomePage(),
+    const HomePage(),
     const chat.ChatHomeScreen(),
     const profile.ProfilePage(),
   ];
@@ -34,8 +31,7 @@ class _UserScreenState extends State<UserScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedIndex = widget
-        .initialIndex; // Initialize the selected index with the passed value
+    _selectedIndex = widget.initialIndex;
     _checkUserStatus();
   }
 
@@ -50,30 +46,21 @@ class _UserScreenState extends State<UserScreen> {
 
         if (userDoc.exists) {
           final isRemoved = userDoc.data()?['isRemoved'] ?? false;
+
           if (isRemoved) {
             await FirebaseAuth.instance.signOut();
+
+            if (!mounted) return;
             Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (context) => LoginScreen()),
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
               (route) => false,
             );
 
-            // Show alert message
             showDialog(
               context: context,
+              barrierDismissible: false,
               builder: (BuildContext context) {
-                return AlertDialog(
-                  title: Text('Account Suspended'),
-                  content: Text(
-                      'Your account has been temporarily removed. For assistance, please contact support or visit the help page.'),
-                  actions: [
-                    TextButton(
-                      child: Text('OK'),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                  ],
-                );
+                return const TemporaryRemovedPopup();
               },
             );
           }
@@ -92,8 +79,7 @@ class _UserScreenState extends State<UserScreen> {
     });
   }
 
-  static const IconData card_travel =
-      IconData(0xe140, fontFamily: 'MaterialIcons');
+  static const IconData card = IconData(0xe140, fontFamily: 'MaterialIcons');
 
   @override
   Widget build(BuildContext context) {
@@ -103,12 +89,12 @@ class _UserScreenState extends State<UserScreen> {
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         iconSize: 20, // Default size for unselected icons
-        selectedIconTheme: IconThemeData(
+        selectedIconTheme: const IconThemeData(
           size: 32, // Slightly larger size for selected icon
         ),
-        items: [
+        items: const [
           BottomNavigationBarItem(
-            icon: Icon(card_travel), // Use the 'card_travel' icon
+            icon: Icon(card), // Use the 'card_travel' icon
             label: 'Travel Asists',
           ),
           BottomNavigationBarItem(

@@ -8,13 +8,12 @@ class ChatPopup extends StatefulWidget {
   const ChatPopup({super.key});
 
   @override
-  _ChatPopupState createState() => _ChatPopupState();
+  ChatPopupState createState() => ChatPopupState();
 }
 
-class _ChatPopupState extends State<ChatPopup> {
+class ChatPopupState extends State<ChatPopup> {
   final TextEditingController _controller = TextEditingController();
   final List<Map<String, String>> _chatHistory = [];
-  final String system_prrompt = 'Your name is Explore Ai';
   bool _isLoading = false;
 
   void _sendMessage(String userMessage) async {
@@ -24,33 +23,23 @@ class _ChatPopupState extends State<ChatPopup> {
       _chatHistory.add({'role': 'user', 'message': userMessage});
       _isLoading = true;
     });
-
     try {
-      // Use multi-turn conversation (gemini.chat)
       final gemini = Gemini.instance;
-
-      // Define the system prompt and the user details more clearly
-      final systemPrompt = 'Your name is Explore Ai';
-      final userDetails = {
-        'username': 'Ajmal'
-      }; // Adjust this based on your use case
-
-      // Define the conversation context
+      const systemPrompt = 'Your name is Explore Ai';
+      final userDetails = {'username': 'Ajmal'};
       final conversation = [
         Content(parts: [
           Part.text(
               'system_prompt: $systemPrompt, userDetails: $userDetails, user_input: $userMessage')
         ], role: 'user'),
         ..._chatHistory
-            .where((msg) => msg['role'] == 'model') // Include model responses
+            .where((msg) => msg['role'] == 'model')
             .map((msg) => Content(parts: [
                   Part.text(msg['message']!),
                 ], role: 'model'))
       ];
 
       final response = await gemini.chat(conversation);
-
-      // Add the model's response to the chat history
       setState(() {
         _chatHistory.add({
           'role': 'model',
@@ -85,7 +74,7 @@ class _ChatPopupState extends State<ChatPopup> {
         ),
         child: Text(
           message,
-          style: TextStyle(fontSize: 16.0),
+          style: const TextStyle(fontSize: 16.0),
         ),
       ),
     );
@@ -104,59 +93,95 @@ class _ChatPopupState extends State<ChatPopup> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.0)),
       child: Container(
-        height: 400,
-        padding: const EdgeInsets.all(12.0),
+        height: 450,
+        padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
         child: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Chat',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+              decoration: const BoxDecoration(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16.0)),
+                gradient: LinearGradient(
+                  colors: [Colors.blueAccent, Colors.lightBlue],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'AI Chatbot',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(height: 8.0),
             Expanded(
               child: _chatHistory.isEmpty
                   ? const Center(
-                      child: Text('No messages yet. Start the conversation!'))
+                      child: Text(
+                        'Chat With Explore AI',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                    )
                   : _buildChatList(),
             ),
             if (_isLoading)
               const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: CircularProgressIndicator(),
+                padding: EdgeInsets.symmetric(vertical: 8.0),
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blueAccent),
+                ),
               ),
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
               child: Row(
                 children: [
                   Expanded(
                     child: TextField(
                       controller: _controller,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'Type a message...',
-                        border: OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Colors.grey[200],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: BorderSide.none,
+                        ),
                       ),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.send),
-                    onPressed: () {
-                      final message = _controller.text;
-                      _controller.clear();
-                      _sendMessage(message);
-                    },
-                  )
+                  const SizedBox(width: 8.0),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.blueAccent,
+                      borderRadius: BorderRadius.circular(12.0),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.send, color: Colors.white),
+                      onPressed: () {
+                        final message = _controller.text;
+                        _controller.clear();
+                        _sendMessage(message);
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),

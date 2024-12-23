@@ -11,6 +11,7 @@ import '../profileScreen/post&trip/post_detail_screen.dart';
 import '../userDetailsScreen/others_user_profile.dart';
 import '../userDetailsScreen/post&trip/post&trip/other_user_post_detail_screen.dart';
 import 'chatbot.dart';
+import 'notification_sceen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -86,25 +87,19 @@ class HomePageState extends State<HomePage> {
           .toList();
 
       if (filteredDocs.isEmpty) {
-        setState(() {
-          hasMorePosts = false;
-          isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            hasMorePosts = false;
+            isLoading = false;
+          });
+        }
         return;
       }
-
-      // Shuffle the posts locally
       filteredDocs.shuffle(_random);
-
-      // Track shown post IDs
       for (var doc in filteredDocs) {
         shownPostIds.add(doc.id);
       }
-
-      // Update the last document
       _lastDocument = filteredDocs.last;
-
-      // Fetch users for posts
       await _fetchUsersForPosts(filteredDocs);
 
       if (mounted) {
@@ -115,9 +110,11 @@ class HomePageState extends State<HomePage> {
       }
     } catch (e) {
       print('Error fetching initial posts: $e');
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -129,50 +126,45 @@ class HomePageState extends State<HomePage> {
     });
 
     try {
-      // Fetch additional posts ordered by ID
       final querySnapshot = await FirebaseFirestore.instance
           .collection('post')
           .orderBy(FieldPath.documentId)
           .startAfterDocument(_lastDocument!)
-          .limit(_pageSize) // Fetch extra posts for better shuffling
+          .limit(_pageSize)
           .get();
-
-      // Filter out already shown posts
       final filteredDocs = querySnapshot.docs
           .where((doc) => !shownPostIds.contains(doc.id))
           .toList();
 
       if (filteredDocs.isEmpty) {
-        setState(() {
-          hasMorePosts = false;
-          isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            hasMorePosts = false;
+            isLoading = false;
+          });
+        }
         return;
       }
-
-      // Shuffle the posts locally
       filteredDocs.shuffle(_random);
-
-      // Track shown post IDs
       for (var doc in filteredDocs) {
         shownPostIds.add(doc.id);
       }
-
-      // Update the last document
       _lastDocument = filteredDocs.last;
-
-      // Fetch users for new posts
       await _fetchUsersForPosts(filteredDocs);
 
-      setState(() {
-        posts.addAll(filteredDocs); // Append shuffled posts
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          posts.addAll(filteredDocs);
+          isLoading = false;
+        });
+      }
     } catch (e) {
       print('Error fetching more posts: $e');
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -187,10 +179,7 @@ class HomePageState extends State<HomePage> {
           .where(FieldPath.documentId, whereIn: userIds.toList())
           .get();
 
-      final newUsers = {
-        for (var doc in userSnapshots.docs)
-          doc.id: doc.data() as Map<String, dynamic>
-      };
+      final newUsers = {for (var doc in userSnapshots.docs) doc.id: doc.data()};
 
       setState(() {
         users.addAll(newUsers);
@@ -215,14 +204,15 @@ class HomePageState extends State<HomePage> {
       final querySnapshot = await query.get();
 
       if (querySnapshot.docs.isEmpty) {
-        setState(() {
-          hasMorePosts = false;
-          isLoading = false;
-        });
+        if (mounted) {
+          // Check if the widget is still mounted
+          setState(() {
+            hasMorePosts = false;
+            isLoading = false;
+          });
+        }
         return;
       }
-
-      // Filter posts based on search query
       final filteredPosts = querySnapshot.docs.where((doc) {
         final data = doc.data() as Map<String, dynamic>;
         final locationName =
@@ -246,27 +236,33 @@ class HomePageState extends State<HomePage> {
       }).toList();
 
       if (filteredPosts.isEmpty) {
-        setState(() {
-          hasMorePosts = false;
-          isLoading = false;
-        });
+        if (mounted) {
+          // Check if the widget is still mounted
+          setState(() {
+            hasMorePosts = false;
+            isLoading = false;
+          });
+        }
         return;
       }
 
       _lastDocument = filteredPosts.last;
 
-      // Fetch users for filtered posts
       await _fetchUsersForPosts(filteredPosts);
 
-      setState(() {
-        posts = filteredPosts;
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          posts = filteredPosts;
+          isLoading = false;
+        });
+      }
     } catch (e) {
       print('Error searching posts: $e');
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -302,54 +298,131 @@ class HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: TextField(
-          controller: _searchController,
-          onChanged: (value) {
-            setState(() {
-              _searchQuery = value;
-              isSearchTriggered = false;
-            });
-          },
-          onSubmitted: (value) {
-            setState(() {
-              _searchQuery = value;
-              isSearchTriggered = true;
-              _searchPosts();
-            });
-          },
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.white,
-            hintText: 'Search...',
-            hintStyle: TextStyle(color: Colors.grey[500], fontSize: 16),
-            prefixIcon: Icon(
-              Icons.search,
-              color: Colors.grey[600],
-            ),
-            suffixIcon: _searchQuery.isNotEmpty
-                ? IconButton(
-                    icon: Icon(
-                      Icons.clear,
-                      color: Colors.grey[600],
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _searchController.clear();
-                        _searchQuery = "";
-                        isSearchTriggered = false;
-                        _fetchInitialPosts();
-                      });
-                    },
-                  )
-                : null,
-            contentPadding:
-                const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(30),
-              borderSide: BorderSide.none,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight + 10.0),
+        child: AppBar(
+          toolbarHeight: kToolbarHeight + 10.0,
+          title: TextField(
+            controller: _searchController,
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value;
+                isSearchTriggered = false;
+              });
+            },
+            onSubmitted: (value) {
+              setState(() {
+                _searchQuery = value;
+                isSearchTriggered = true;
+                _searchPosts();
+              });
+            },
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.white,
+              hintText: 'Search...',
+              hintStyle: TextStyle(color: Colors.grey[500], fontSize: 16),
+              prefixIcon: Icon(
+                Icons.search,
+                color: Colors.grey[600],
+              ),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: Icon(
+                        Icons.clear,
+                        color: Colors.grey[600],
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _searchController.clear();
+                          _searchQuery = "";
+                          isSearchTriggered = false;
+                          _fetchInitialPosts();
+                        });
+                      },
+                    )
+                  : null,
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30),
+                borderSide: const BorderSide(
+                    color: Colors.blue, width: 2), // Add a border here
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30),
+                borderSide: const BorderSide(
+                    color: Colors.blue, width: 2), // Border when focused
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30),
+                borderSide: const BorderSide(
+                    color: Colors.grey, width: 1), // Border when enabled
+              ),
             ),
           ),
+          actions: [
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('user')
+                  .doc(currentUserId)
+                  .collection('notifications')
+                  .where('isSeen', isEqualTo: false)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                int unseenCount = 0;
+
+                if (snapshot.hasData) {
+                  unseenCount = snapshot.data!.docs.length;
+                }
+
+                return Stack(
+                  children: [
+                    IconButton(
+                      icon: const Icon(
+                        Icons.notifications,
+                        size: 30.0,
+                        color: Colors.blueGrey,
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const NotificationsPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    if (unseenCount > 0)
+                      Positioned(
+                        right: 14,
+                        top: 13,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 10,
+                            minHeight: 10,
+                          ),
+                          child: Text(
+                            '$unseenCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ],
         ),
       ),
       body: Column(
@@ -437,7 +510,7 @@ class HomePageState extends State<HomePage> {
                                 borderRadius: BorderRadius.circular(15)),
                             color: tripCompleted
                                 ? Colors.green[100]
-                                : Colors.white, // Green if tripCompleted
+                                : Colors.white,
                             child: Padding(
                               padding: const EdgeInsets.all(12.0),
                               child: Column(
@@ -574,12 +647,12 @@ class HomePageState extends State<HomePage> {
             },
           );
         },
-        child: const Icon(Icons.chat),
         backgroundColor: Colors.blue,
         mini: true,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(50),
         ),
+        child: const Icon(Icons.chat),
       ),
     );
   }

@@ -44,6 +44,9 @@ class UserAuthServices {
         'x': null,
         'isRemoved': false,
         'location': location,
+        'following': null,
+        'notifications': null,
+        'onId': null
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

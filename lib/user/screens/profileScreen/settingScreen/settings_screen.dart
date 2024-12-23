@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../login_screen.dart';
 import '../../chatScreen/chat_utils.dart';
 import 'accoundManagement/account_management_screen.dart';
@@ -8,6 +10,8 @@ import 'help/help_screen.dart';
 import 'support/support_screen.dart';
 
 class SettingsPage extends StatelessWidget {
+  const SettingsPage({super.key});
+
   Future<void> clearFirestoreCache() async {
     try {
       await FirebaseFirestore.instance.clearPersistence();
@@ -135,21 +139,74 @@ class SettingsPage extends StatelessWidget {
                 ),
               );
               if (shouldLogout == true) {
-                await OptimizedNetworkImage.clearImageCache();
+                try {
+                  final userId = FirebaseAuth.instance.currentUser?.uid;
+                  if (userId != null) {
+                    // Clear OneSignal player ID
+                    final playerId = OneSignal.User.pushSubscription.id;
+                    final userDocRef = FirebaseFirestore.instance
+                        .collection('user')
+                        .doc(userId);
+                    final userDocSnapshot = await userDocRef.get();
 
-                // Clear Firestore cache
-                await clearFirestoreCache();
+                    // Update OneSignal IDs
+                    List<String> existingPlayerIds = [];
+                    if (userDocSnapshot.exists) {
+                      final userData = userDocSnapshot.data();
+                      existingPlayerIds =
+                          List<String>.from(userData?['onId'] ?? []);
+                      existingPlayerIds.remove(playerId);
 
-                // Clear local database cache
-                await ChatCacheManager().clearCache();
+                      if (existingPlayerIds.isNotEmpty) {
+                        await userDocRef.set({'onId': existingPlayerIds},
+                            SetOptions(merge: true));
+                      } else {
+                        await userDocRef.update({'onId': FieldValue.delete()});
+                      }
+                    }
 
-                // Clear shared preferences
-                await PreferencesManager.clearPreferences();
-                await FirebaseAuth.instance.signOut();
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => LoginScreen()),
-                  (route) => false,
-                );
+                    // Clear all chat-related cached data
+                    final prefs = await SharedPreferences.getInstance();
+                    final keys = prefs.getKeys().toList();
+
+                    // Remove all chat-related preferences
+                    for (final key in keys) {
+                      if (key.startsWith('cached_messages_') ||
+                          key.startsWith('cached_chats') ||
+                          key.startsWith('chat_')) {
+                        await prefs.remove(key);
+                      }
+                    }
+
+                    // Clear image cache
+                    await OptimizedNetworkImage.clearImageCache();
+                    imageCache.clear();
+                    imageCache.clearLiveImages();
+
+                    // Clear Firestore cache
+                    await clearFirestoreCache();
+
+                    // Clear all app preferences
+                    await PreferencesManager.clearPreferences();
+
+                    // Sign out from Firebase
+                    await FirebaseAuth.instance.signOut();
+
+                    // Navigate to login screen
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (context) => LoginScreen()),
+                      (route) => false,
+                    );
+                  }
+                } catch (e) {
+                  print('Error during logout: $e');
+                  // Show error message to user if needed
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text(
+                            'Error occurred during logout. Please try again.')),
+                  );
+                }
               }
             },
           ),

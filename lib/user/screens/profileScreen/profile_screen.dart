@@ -6,6 +6,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../utils/app_colors.dart';
 import '../../../utils/loading.dart';
+import '../followersScreen/followers_screen.dart';
+import '../homeScreen/notification_sceen.dart';
 import '../uploadScreen/post_upload.dart';
 import '../uploadScreen/trip_upload.dart';
 import 'edit_profile_screen.dart';
@@ -17,13 +19,31 @@ class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  _ProfilePageState createState() => _ProfilePageState();
+  ProfilePageState createState() => ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
+class ProfilePageState extends State<ProfilePage> {
+  String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
   bool showPosts = true;
   int totalPosts = 0;
   int completedPosts = 0;
+  int followersCount = 0;
+
+  Future<void> _getFollowersCount() async {
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('user')
+          .doc(currentUserId)
+          .get();
+
+      final followersList = userDoc.data()?['following'] ?? [];
+      setState(() {
+        followersCount = followersList.length;
+      });
+    } catch (e) {
+      print('Error fetching followers count: $e');
+    }
+  }
 
   Future<void> _getUserProfilePosts() async {
     try {
@@ -49,6 +69,7 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     _getUserProfilePosts();
+    _getFollowersCount();
   }
 
   @override
@@ -56,9 +77,65 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       appBar: AppBar(
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () {},
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('user')
+                .doc(currentUserId)
+                .collection('notifications')
+                .where('isSeen', isEqualTo: false)
+                .snapshots(),
+            builder: (context, snapshot) {
+              int unseenCount = 0;
+
+              if (snapshot.hasData) {
+                unseenCount = snapshot.data!.docs.length;
+              }
+
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.notifications,
+                      size: 27.0,
+                      color: Colors.blueGrey,
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationsPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  if (unseenCount > 0)
+                    Positioned(
+                      right: 14,
+                      top: 13,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 10,
+                          minHeight: 10,
+                        ),
+                        child: Text(
+                          '$unseenCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           IconButton(
             icon: const Icon(Icons.menu),
@@ -134,7 +211,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                             imageUrl:
                                                 userImage, // URL of the image
                                             placeholder: (context, url) =>
-                                                CircularProgressIndicator(), // Placeholder widget while loading
+                                                LoadingAnimation(), // Placeholder widget while loading
                                             errorWidget: (context, url,
                                                     error) =>
                                                 Icon(Icons
@@ -176,10 +253,46 @@ class _ProfilePageState extends State<ProfilePage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment
-                                    .center, // Center the row content
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  // Column for "Posts"
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              FollowingUsersPage(
+                                                  userId: currentUserId),
+                                        ),
+                                      );
+                                    },
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            '$followersCount',
+                                            style: const TextStyle(
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const Text(
+                                            'Buddies',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 30),
                                   Column(
                                     mainAxisAlignment: MainAxisAlignment
                                         .center, // Center the content vertically in the column
@@ -190,7 +303,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                         '$totalPosts', // The count (number) at the top
                                         style: const TextStyle(
                                           fontSize:
-                                              24, // Larger font size for the count
+                                              22, // Larger font size for the count
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -205,7 +318,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     ],
                                   ),
 
-                                  const SizedBox(width: 60),
+                                  const SizedBox(width: 30),
 
                                   // Column for "Completed"
                                   Column(
@@ -218,7 +331,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                         '$completedPosts', // The count (number) at the top
                                         style: const TextStyle(
                                           fontSize:
-                                              24, // Larger font size for the count
+                                              22, // Larger font size for the count
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -249,13 +362,13 @@ class _ProfilePageState extends State<ProfilePage> {
                         Text(
                           profileData['fullname'],
                           style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.bold),
+                              fontSize: 15, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 8),
-                        Text('DOB: ${profileData['dob']}'),
-                        const SizedBox(height: 8),
-                        Text('Gender: ${profileData['gender']}'),
-                        const SizedBox(height: 16),
+                        //Text('DOB: ${profileData['dob']}'),
+                        // const SizedBox(height: 8),
+                        // Text('Gender: ${profileData['gender']}'),
+                        // const SizedBox(height: 16),
                         Text(profileData['userbio'] ?? '',
                             style: const TextStyle(fontSize: 14)),
                       ],

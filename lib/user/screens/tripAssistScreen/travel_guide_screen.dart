@@ -15,11 +15,11 @@ class TravelAgencyPage extends StatefulWidget {
   const TravelAgencyPage({super.key});
 
   @override
-  _TravelAgencyPageState createState() => _TravelAgencyPageState();
+  TravelAgencyPageState createState() => TravelAgencyPageState();
 }
 
-class _TravelAgencyPageState extends State<TravelAgencyPage> {
-  TextEditingController _searchController = TextEditingController();
+class TravelAgencyPageState extends State<TravelAgencyPage> {
+  final TextEditingController _searchController = TextEditingController();
 
   List<Map<String, dynamic>> filteredAgencies = [];
   List<Map<String, dynamic>> allAgencies = [];
@@ -82,34 +82,42 @@ class _TravelAgencyPageState extends State<TravelAgencyPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Trip Providers"),
+        
+        toolbarHeight: kToolbarHeight + 10.0,
+        title: TextField(
+          controller: _searchController,
+          onChanged: (query) => _filterAgencies(query),
+          decoration: InputDecoration(
+            hintText: 'Search here...',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _searchController.text.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      _searchController.clear();
+                      _filterAgencies('');
+                    },
+                  )
+                : null,
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(30),
+              borderSide: const BorderSide(color: Colors.blue, width: 2),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(30),
+              borderSide: const BorderSide(color: Colors.blue, width: 2),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(30),
+              borderSide: const BorderSide(color: Colors.grey, width: 1),
+            ),
+          ),
+        ),
       ),
       body: Column(
         children: [
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (query) => _filterAgencies(query),
-              decoration: InputDecoration(
-                hintText: 'Search here...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20.0),
-                ),
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    _searchController.clear();
-                    _filterAgencies(''); // Reset filter
-                  },
-                ),
-              ),
-            ),
-          ),
-
-          // Horizontal Scrollable Category Selector
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(

@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'chat_utils.dart';
 
 class ChatScreen extends StatefulWidget {
   final String currentUserId;
   final String chatUserId;
   final String chatRoomId;
+  final VoidCallback onMessageSent;
 
   const ChatScreen({
     required this.currentUserId,
     required this.chatUserId,
     required this.chatRoomId,
+    required this.onMessageSent,
     super.key,
   });
 
@@ -21,19 +25,19 @@ class ChatScreen extends StatefulWidget {
 
 class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final TextEditingController _messageController = TextEditingController();
-  final ChatCacheManager _cacheManager = ChatCacheManager();
   final BehaviorSubject<List<Map<String, dynamic>>> _messagesController =
       BehaviorSubject<List<Map<String, dynamic>>>.seeded([]);
+  final ScrollController _scrollController = ScrollController();
 
   bool isLoading = true;
   bool isUserOnline = false;
+  bool isOffline = false;
   Map<String, dynamic>? userDetails;
 
   // Pagination variables
-  static const int _messagesPerPage = 20; // Fetch limited messages initially
+  static const int _messagesPerPage = 20;
   DocumentSnapshot? _lastDocument;
   bool _hasMoreMessages = true;
-  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -41,62 +45,111 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _initializeChat();
     _setupScrollListener();
+    _checkConnectivity();
+    _markMessagesAsSeen();
+  }
+
+  Future<void> _markMessagesAsSeen() async {
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+
+      final unseenMessages = await FirebaseFirestore.instance
+          .collection('chat/${widget.chatRoomId}/messages')
+          .where('senderId', isEqualTo: widget.chatUserId)
+          .where('isSeen', isEqualTo: false)
+          .get();
+
+      for (var doc in unseenMessages.docs) {
+        batch.update(doc.reference, {'isSeen': true});
+      }
+
+      await batch.commit();
+    } catch (e) {
+      print('Error marking messages as seen: $e');
+    }
+  }
+
+  Future<void> _checkConnectivity() async {
+    try {
+      await FirebaseFirestore.instance.runTransaction((transaction) async {});
+      setState(() => isOffline = false);
+    } catch (e) {
+      setState(() => isOffline = true);
+    }
+  }
+
+  Future<void> _saveMessagesToCache(List<Map<String, dynamic>> messages) async {
+    final prefs = await SharedPreferences.getInstance();
+    final messagesJson = json.encode(messages.map((message) {
+      return {
+        ...message,
+        'createdAt': (message['createdAt'] as Timestamp).millisecondsSinceEpoch,
+      };
+    }).toList());
+    await prefs.setString('cached_messages_${widget.chatRoomId}', messagesJson);
+  }
+
+  Future<List<Map<String, dynamic>>> _loadMessagesFromCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    final messagesJson =
+        prefs.getString('cached_messages_${widget.chatRoomId}');
+    if (messagesJson != null) {
+      final List<dynamic> decodedMessages = json.decode(messagesJson);
+      return decodedMessages.map((message) {
+        return {
+          ...Map<String, dynamic>.from(message),
+          'createdAt':
+              Timestamp.fromMillisecondsSinceEpoch(message['createdAt']),
+        };
+      }).toList();
+    }
+    return [];
   }
 
   void _setupScrollListener() {
     _scrollController.addListener(() {
       if (_scrollController.position.pixels ==
           _scrollController.position.minScrollExtent) {
-        // Trigger loading older messages when scrolled to the top
         _loadMoreMessages();
       }
     });
   }
 
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _messageController.dispose();
-    _scrollController.dispose();
-    _messagesController.close();
-    super.dispose();
-  }
-
   Future<void> _initializeChat() async {
     try {
-      // Initialize the local database
-      await _cacheManager.initDatabase();
+      // Load cached messages first
+      final cachedMessages = await _loadMessagesFromCache();
+      if (cachedMessages.isNotEmpty) {
+        _messagesController.add(cachedMessages);
+      }
 
-      // Fetch initial user details and cache messages concurrently
-      final userFuture = FirebaseFirestore.instance
-          .collection('user')
-          .doc(widget.chatUserId)
-          .get();
+      if (!isOffline) {
+        final userFuture = FirebaseFirestore.instance
+            .collection('user')
+            .doc(widget.chatUserId)
+            .get();
 
-      final onlineStatusFuture =
-          UserStatusManager.getUserOnlineStatus(widget.chatUserId);
+        final onlineStatusFuture =
+            UserStatusManager.getUserOnlineStatus(widget.chatUserId);
 
-      final cachedMessagesFuture = _cacheManager.getCachedMessages(
-        widget.chatRoomId,
-        limit: _messagesPerPage,
-      );
+        final results = await Future.wait([
+          userFuture,
+          onlineStatusFuture,
+        ]);
 
-      final results = await Future.wait([
-        userFuture,
-        onlineStatusFuture,
-        cachedMessagesFuture,
-      ]);
+        setState(() {
+          userDetails =
+              (results[0] as DocumentSnapshot).data() as Map<String, dynamic>?;
+          isUserOnline = results[1] as bool;
+        });
+
+        // Start listening for new messages in real-time
+        _setupMessageListener();
+      }
 
       setState(() {
-        userDetails =
-            (results[0] as DocumentSnapshot).data() as Map<String, dynamic>?;
-        isUserOnline = results[1] as bool;
-        _messagesController.add(results[2] as List<Map<String, dynamic>>);
         isLoading = false;
       });
-
-      // Start listening for new messages in real-time
-      _setupMessageListener();
     } catch (e) {
       print("Error initializing chat: $e");
       setState(() {
@@ -115,6 +168,11 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _updateMessagesWithSnapshot(snapshot);
     }, onError: (error) {
       print("Error listening to messages: $error");
+      _loadMessagesFromCache().then((messages) {
+        if (messages.isNotEmpty) {
+          _messagesController.add(messages);
+        }
+      });
     });
   }
 
@@ -128,20 +186,16 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           'createdAt': doc['createdAt'] ?? Timestamp.now(),
         };
       }).toList();
+      await _saveMessagesToCache(liveMessages);
 
-      await _cacheManager.batchCacheMessages(liveMessages, widget.chatRoomId);
-
-      final currentMessages = _messagesController.value;
-      final mergedMessages = _mergeMessages(currentMessages, liveMessages);
-
-      _messagesController.add(mergedMessages);
+      _messagesController.add(liveMessages);
     } catch (e) {
       print("Error updating messages: $e");
     }
   }
 
   Future<void> _loadMoreMessages() async {
-    if (!_hasMoreMessages) return;
+    if (!_hasMoreMessages || isOffline) return;
 
     try {
       final query = FirebaseFirestore.instance
@@ -167,13 +221,11 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         };
       }).toList();
 
-      await _cacheManager.batchCacheMessages(newMessages, widget.chatRoomId);
-
       final currentMessages = _messagesController.value;
       final mergedMessages = _mergeMessages(currentMessages, newMessages);
+      await _saveMessagesToCache(mergedMessages);
 
       _messagesController.add(mergedMessages);
-
       _lastDocument = snapshot.docs.last;
     } catch (e) {
       print("Error loading more messages: $e");
@@ -198,47 +250,64 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           (b['createdAt'] as Timestamp).compareTo(a['createdAt'] as Timestamp));
   }
 
-  void _sendMessage() async {
+  Future<void> _sendMessage() async {
     final messageText = _messageController.text.trim();
-    _messageController.clear();
     if (messageText.isEmpty) return;
+    _messageController.clear();
 
-    try {
-      final messageRef = FirebaseFirestore.instance
-          .collection('chat/${widget.chatRoomId}/messages');
+    final newMessage = {
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'senderId': widget.currentUserId,
+      'text': messageText,
+      'createdAt': Timestamp.now(),
+      'isSeen': false
+    };
 
-      final newMessage = await messageRef.add({
-        'senderId': widget.currentUserId,
-        'text': messageText,
-        'createdAt': FieldValue.serverTimestamp(),
-        'isSeen': false
-      });
+    // Add to local stream immediately
+    final currentMessages = _messagesController.value;
+    final updatedMessages = [newMessage, ...currentMessages];
+    _messagesController.add(updatedMessages);
 
-      await _cacheManager.cacheMessage(
-        {
-          'id': newMessage.id,
+    // Save to cache
+    await _saveMessagesToCache(updatedMessages);
+
+    if (!isOffline) {
+      try {
+        final messageRef = FirebaseFirestore.instance
+            .collection('chat/${widget.chatRoomId}/messages');
+
+        await messageRef.add({
           'senderId': widget.currentUserId,
           'text': messageText,
-          'createdAt': Timestamp.now(),
+          'createdAt': FieldValue.serverTimestamp(),
           'isSeen': false
-        },
-        widget.chatRoomId,
-      );
+        });
 
-      await FirebaseFirestore.instance
-          .collection('chat')
-          .doc(widget.chatRoomId)
-          .update({
-        'latestMessage': messageText,
-        'latestMessageTime': FieldValue.serverTimestamp()
-      });
+        await FirebaseFirestore.instance
+            .collection('chat')
+            .doc(widget.chatRoomId)
+            .update({
+          'latestMessage': messageText,
+          'latestMessageTime': FieldValue.serverTimestamp()
+        });
 
-      _messageController.clear();
-    } catch (e) {
-      print("Error sending message: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to send message")),
-      );
+        widget.onMessageSent();
+      } catch (e) {
+        print("Error sending message: $e");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text("Message saved offline. Will sync when online.")),
+          );
+        }
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text("Message saved offline. Will sync when online.")),
+        );
+      }
     }
   }
 
@@ -262,12 +331,26 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(userDetails?['username'] ?? 'Loading...'),
-                Text(
-                  isUserOnline ? 'Online' : 'Offline',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isUserOnline ? Colors.green : Colors.grey,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      isOffline
+                          ? 'Offline Mode'
+                          : (isUserOnline ? 'Online' : 'Offline'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isOffline
+                            ? Colors.orange
+                            : (isUserOnline ? Colors.green : Colors.grey),
+                      ),
+                    ),
+                    if (isOffline)
+                      const Padding(
+                        padding: EdgeInsets.only(left: 4),
+                        child: Icon(Icons.offline_bolt,
+                            size: 14, color: Colors.orange),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -276,110 +359,168 @@ class ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Expanded(
-                  child: StreamBuilder<List<Map<String, dynamic>>>(
-                    stream: _messagesController.stream,
-                    builder: (context, snapshot) {
-                      if (isLoading) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return const Center(
-                          child:
-                              Text('No messages yet. Start the conversation!'),
-                        );
-                      }
+          : GestureDetector(
+              onTap: _markMessagesAsSeen,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: StreamBuilder<List<Map<String, dynamic>>>(
+                      stream: _messagesController.stream,
+                      builder: (context, snapshot) {
+                        // Check if we're still in the initial loading state
+                        if (!snapshot.hasData && isLoading) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        }
 
-                      final messages = snapshot.data!;
-                      return ListView.builder(
-                        controller: _scrollController,
-                        reverse: true,
-                        itemCount: messages.length + (_hasMoreMessages ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (_hasMoreMessages && index == messages.length) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          }
-
-                          final message = messages[index];
-                          return ChatBubble(
-                            isSentByCurrentUser:
-                                message['senderId'] == widget.currentUserId,
-                            text: message['text'],
-                            createdAt: message['createdAt'],
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-                const Divider(height: 1),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          child: TextField(
-                            controller: _messageController,
-                            decoration: InputDecoration(
-                              hintText: 'Type a message...',
-                              hintStyle: TextStyle(color: Colors.grey[600]),
-                              filled: true,
-                              fillColor: Colors.grey[200],
-                              contentPadding: EdgeInsets.symmetric(
-                                  vertical: 16,
-                                  horizontal: 16), // Increased vertical padding
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30),
-                                borderSide: BorderSide.none,
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30),
-                                borderSide:
-                                    BorderSide(color: Colors.blueAccent),
-                              ),
+                        // If we have no data after loading is complete, show the empty state
+                        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.chat_bubble_outline,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No messages yet',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Start the conversation!',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
+                              ],
                             ),
-                            onSubmitted: (_) => _sendMessage(),
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4),
-                        child: IconButton(
-                          icon: Icon(
-                            Icons.send,
-                            color: Colors.blueAccent,
-                          ),
-                          onPressed: _sendMessage,
-                          splashColor: Colors.blueAccent.withOpacity(0.3),
-                          splashRadius: 25,
-                        ),
-                      ),
-                    ],
+                          );
+                        }
+
+                        final messages = snapshot.data!;
+                        return ListView.builder(
+                          controller: _scrollController,
+                          reverse: true,
+                          itemCount:
+                              messages.length + (_hasMoreMessages ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (_hasMoreMessages && index == messages.length) {
+                              return const Padding(
+                                padding: EdgeInsets.all(8.0),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              );
+                            }
+
+                            final message = messages[index];
+                            return ChatBubble(
+                              isSentByCurrentUser:
+                                  message['senderId'] == widget.currentUserId,
+                              text: message['text'],
+                              createdAt: message['createdAt'],
+                            );
+                          },
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: TextField(
+                              controller: _messageController,
+                              decoration: InputDecoration(
+                                hintText: 'Type a message...',
+                                hintStyle: TextStyle(color: Colors.grey[600]),
+                                filled: true,
+                                fillColor: Colors.grey[200],
+                                contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 16, horizontal: 16),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                  borderSide: BorderSide.none,
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                  borderSide: const BorderSide(
+                                      color: Colors.blueAccent),
+                                ),
+                              ),
+                              onSubmitted: (_) => _sendMessage(),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4),
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.send,
+                              color: Colors.blueAccent,
+                            ),
+                            onPressed: _sendMessage,
+                            splashColor: Colors.blueAccent.withOpacity(0.3),
+                            splashRadius: 25,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
     );
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _messageController.dispose();
+    _scrollController.dispose();
+    _messagesController.close();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _checkConnectivity();
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        break;
+    }
   }
 }
 
 class ChatBubble extends StatelessWidget {
   final bool isSentByCurrentUser;
   final String text;
-  final dynamic createdAt; // Accept dynamic since it might be int or Timestamp
+  final dynamic createdAt;
 
   const ChatBubble({
     required this.isSentByCurrentUser,
     required this.text,
     required this.createdAt,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
