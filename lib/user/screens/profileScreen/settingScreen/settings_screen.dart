@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../login_screen.dart';
-import '../../chatScreen/chat_utils.dart';
+import '../../chat_&_group/chatScreen/chat_utils.dart';
 import 'accoundManagement/account_management_screen.dart';
+import 'feedback_popup.dart';
 import 'help/help_screen.dart';
 import 'support/support_screen.dart';
 
@@ -20,39 +21,28 @@ class SettingsPage extends StatelessWidget {
     }
   }
 
-  Future<void> clearImageCache() async {
-    try {
-      final imageCache = PaintingBinding.instance.imageCache;
-      imageCache.clear();
-      imageCache.clearLiveImages();
-      print('All image cache cleared.');
-    } catch (e) {
-      print('Error clearing image cache: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Settings')),
+      appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
           // Support Section
           ListTile(
-            leading: Icon(Icons.support_agent),
-            title: Text('Support'),
-            trailing: Icon(Icons.chevron_right),
+            leading: const Icon(Icons.support_agent),
+            title: const Text('Support'),
+            trailing: const Icon(Icons.chevron_right),
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => SupportPage()),
+                MaterialPageRoute(builder: (context) => const SupportPage()),
               );
             },
           ),
           ListTile(
-            leading: Icon(Icons.help),
-            title: Text('Help'),
-            trailing: Icon(Icons.chevron_right),
+            leading: const Icon(Icons.help),
+            title: const Text('Help'),
+            trailing: const Icon(Icons.chevron_right),
             onTap: () {
               Navigator.push(
                 context,
@@ -61,9 +51,9 @@ class SettingsPage extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: Icon(Icons.manage_accounts),
-            title: Text('Account Management'),
-            trailing: Icon(Icons.chevron_right),
+            leading: const Icon(Icons.manage_accounts),
+            title: const Text('Account Management'),
+            trailing: const Icon(Icons.chevron_right),
             onTap: () {
               Navigator.push(
                 context,
@@ -73,8 +63,21 @@ class SettingsPage extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: Icon(Icons.logout, color: Colors.red),
-            title: Text(
+            leading: const Icon(Icons.support_agent),
+            title: const Text('Feedback'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return FeedbackPopup();
+                },
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text(
               'Logout',
               style: TextStyle(color: Colors.red),
             ),
@@ -100,14 +103,14 @@ class SettingsPage extends StatelessWidget {
                       ),
                     ],
                   ),
-                  content: Text(
+                  content: const Text(
                     'Are you sure you want to log out?',
                     style: TextStyle(
                       color: Colors.black54,
                       fontSize: 16,
                     ),
                   ),
-                  actionsPadding: EdgeInsets.all(10),
+                  actionsPadding: const EdgeInsets.all(10),
                   actions: [
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
@@ -117,7 +120,7 @@ class SettingsPage extends StatelessWidget {
                         ),
                       ),
                       onPressed: () => Navigator.of(context).pop(false),
-                      child: Text(
+                      child: const Text(
                         'Cancel',
                         style: TextStyle(color: Colors.black),
                       ),
@@ -130,7 +133,7 @@ class SettingsPage extends StatelessWidget {
                         ),
                       ),
                       onPressed: () => Navigator.of(context).pop(true),
-                      child: Text(
+                      child: const Text(
                         'Logout',
                         style: TextStyle(color: Colors.white),
                       ),
@@ -165,20 +168,22 @@ class SettingsPage extends StatelessWidget {
                       }
                     }
 
-                    // Clear all chat-related cached data
+                    // Clear group chat data
                     final prefs = await SharedPreferences.getInstance();
                     final keys = prefs.getKeys().toList();
 
-                    // Remove all chat-related preferences
                     for (final key in keys) {
                       if (key.startsWith('cached_messages_') ||
                           key.startsWith('cached_chats') ||
-                          key.startsWith('chat_')) {
+                          key.startsWith('chat_') ||
+                          key.startsWith('group_') ||
+                          key.startsWith('messages_') ||
+                          key == 'groups') {
                         await prefs.remove(key);
                       }
                     }
 
-                    // Clear image cache
+                    // Clear image caches
                     await OptimizedNetworkImage.clearImageCache();
                     imageCache.clear();
                     imageCache.clearLiveImages();
@@ -188,24 +193,25 @@ class SettingsPage extends StatelessWidget {
 
                     // Clear all app preferences
                     await PreferencesManager.clearPreferences();
-
-                    // Sign out from Firebase
-                    await FirebaseAuth.instance.signOut();
-
-                    // Navigate to login screen
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text(
+                              'Error occurred during logout. Please try again.')),
+                    );
+                  }
+                } finally {
+                  // Sign out from Firebase
+                  await FirebaseAuth.instance.signOut();
+                  if (context.mounted) {
                     Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (context) => LoginScreen()),
+                      MaterialPageRoute(
+                          builder: (context) => const LoginScreen()),
                       (route) => false,
                     );
                   }
-                } catch (e) {
-                  print('Error during logout: $e');
-                  // Show error message to user if needed
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text(
-                            'Error occurred during logout. Please try again.')),
-                  );
                 }
               }
             },

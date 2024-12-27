@@ -8,18 +8,20 @@ import '../../../services/cloudinary_upload.dart';
 import '../../../utils/loading.dart';
 
 class PostUploader extends StatefulWidget {
+  const PostUploader({super.key});
+
   @override
-  _PostUploaderState createState() => _PostUploaderState();
+  PostUploaderState createState() => PostUploaderState();
 }
 
-class _PostUploaderState extends State<PostUploader> {
+class PostUploaderState extends State<PostUploader> {
   final _formKey = GlobalKey<FormState>();
 
   List<File> _selectedImages = [];
   String? _locationName;
   String? _locationDescription;
-  String? _tripDuration;
-  List<String> _tags = [];
+  int? _tripDuration;
+  final List<String> _tags = [];
   String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
   final TextEditingController _tagController = TextEditingController();
 
@@ -93,7 +95,6 @@ class _PostUploaderState extends State<PostUploader> {
     List<String> uploadedImageUrls = [];
 
     try {
-      // Upload images asynchronously
       for (File image in _selectedImages) {
         final response = await CloudinaryService(uploadPreset: 'postImages')
             .uploadImage(selectedImage: image);
@@ -102,7 +103,6 @@ class _PostUploaderState extends State<PostUploader> {
         }
       }
 
-      // Prepare post data
       final postData = {
         'locationName': _locationName,
         'locationDescription': _locationDescription,
@@ -115,10 +115,10 @@ class _PostUploaderState extends State<PostUploader> {
         'tripBuddies': null,
         'tripFeedback': null,
         'visitedPlaces': null,
-        'uploadedDateTime': DateTime.now().toIso8601String()
+        'uploadedDateTime': FieldValue.serverTimestamp(),
+        'likes': null,
+        'tripCompletedDuration': null,
       };
-
-      // Upload post data to Firestore
       await FirebaseFirestore.instance.collection('post').add(postData);
 
       setState(() {
@@ -126,30 +126,38 @@ class _PostUploaderState extends State<PostUploader> {
         _tags.clear();
       });
 
-      // Show success and navigate back
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Post successfully uploaded!")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Post successfully uploaded!")),
+        );
+      }
     } catch (e) {
       print('Error uploading post: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to upload post. Please try again.")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text("Failed to upload post. Please try again.")),
+        );
+      }
     } finally {
       setState(() {
         _isPosting = false;
       });
 
-      Navigator.pop(context); // Close the bottom sheet
-      Future.delayed(const Duration(milliseconds: 300), () {
-        Navigator.pop(context); // Go back to the previous screen
-      });
+      if (mounted) {
+        Navigator.pop(context);
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            Navigator.pop(context);
+          }
+        });
+      }
     }
   }
 
   Widget _imagePickerWidget() {
     return Padding(
-      padding: EdgeInsets.only(left: 16.0, right: 16.0, top: 0.0),
+      padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 0.0),
       child: GestureDetector(
         onTap: _pickImages,
         child: Column(
@@ -162,11 +170,12 @@ class _PostUploaderState extends State<PostUploader> {
                       color: Colors.grey[300],
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Center(child: Text("Tap to select images")),
+                    child: const Center(child: Text("Tap to select images")),
                   )
                 : GridView.builder(
                     shrinkWrap: true,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 3,
                       mainAxisSpacing: 8.0,
                       crossAxisSpacing: 8.0,
@@ -193,7 +202,7 @@ class _PostUploaderState extends State<PostUploader> {
                                   _selectedImages.removeAt(index);
                                 });
                               },
-                              child: CircleAvatar(
+                              child: const CircleAvatar(
                                 radius: 12,
                                 backgroundColor: Colors.red,
                                 child: Icon(Icons.close,
@@ -205,8 +214,8 @@ class _PostUploaderState extends State<PostUploader> {
                       );
                     },
                   ),
-            SizedBox(height: 10),
-            Text(
+            const SizedBox(height: 10),
+            const Text(
               "Tap to reselect images (max 3)",
               style: TextStyle(color: Colors.grey),
             ),
@@ -230,17 +239,15 @@ class _PostUploaderState extends State<PostUploader> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Padding(
-                      padding: EdgeInsets.only(
-                          left: 16.0,
-                          right: 16.0,
-                          top: 0.0), // Customize the values as needed
+                      padding: const EdgeInsets.only(
+                          left: 16.0, right: 16.0, top: 0.0),
                       child: GestureDetector(
                         onTap: _pickImages,
                         child: _imagePickerWidget(),
                       ),
                     ),
                     SizedBox(
-                      width: 350, // Set width for the DOB field
+                      width: 350,
                       child: TextFormField(
                         decoration: InputDecoration(
                           labelText: 'Location Name',
@@ -249,7 +256,7 @@ class _PostUploaderState extends State<PostUploader> {
                           ),
                           filled: true,
                           fillColor: Colors.grey[200],
-                          labelStyle: TextStyle(
+                          labelStyle: const TextStyle(
                               fontSize: 16, fontWeight: FontWeight.w500),
                         ),
                         validator: (value) => value == null || value.isEmpty
@@ -258,9 +265,9 @@ class _PostUploaderState extends State<PostUploader> {
                         onSaved: (value) => _locationName = value,
                       ),
                     ),
-                    SizedBox(height: 5),
+                    const SizedBox(height: 5),
                     SizedBox(
-                      width: 350, // Set width for the DOB field
+                      width: 350,
                       child: TextFormField(
                         decoration: InputDecoration(
                           labelText: 'Location Description',
@@ -269,7 +276,7 @@ class _PostUploaderState extends State<PostUploader> {
                           ),
                           filled: true,
                           fillColor: Colors.grey[200],
-                          labelStyle: TextStyle(
+                          labelStyle: const TextStyle(
                               fontSize: 16, fontWeight: FontWeight.w500),
                         ),
                         validator: (value) => value == null || value.isEmpty
@@ -278,29 +285,42 @@ class _PostUploaderState extends State<PostUploader> {
                         onSaved: (value) => _locationDescription = value,
                       ),
                     ),
-                    SizedBox(height: 5),
+                    const SizedBox(height: 5),
                     SizedBox(
-                      width: 350, // Set width for the DOB field
+                      width: 350,
                       child: TextFormField(
+                        keyboardType:
+                            TextInputType.number, // Show number keyboard
                         decoration: InputDecoration(
-                          labelText: 'Trip Duration',
+                          labelText: 'Trip Duration (in days)',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                           filled: true,
                           fillColor: Colors.grey[200],
-                          labelStyle: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w500),
+                          labelStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                        validator: (value) => value == null || value.isEmpty
-                            ? 'Enter trip duration'
-                            : null,
-                        onSaved: (value) => _tripDuration = value,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Enter trip duration';
+                          }
+                          if (int.tryParse(value) == null ||
+                              int.parse(value) <= 0) {
+                            return 'Enter a valid positive number';
+                          }
+                          return null;
+                        },
+                        onSaved: (value) {
+                          _tripDuration = int.tryParse(value!);
+                        },
                       ),
                     ),
-                    SizedBox(height: 5),
+                    const SizedBox(height: 5),
                     SizedBox(
-                      width: 350, // Set width for the DOB field
+                      width: 350,
                       child: TextFormField(
                         controller: _tagController,
                         decoration: InputDecoration(
@@ -311,12 +331,12 @@ class _PostUploaderState extends State<PostUploader> {
                           filled: true,
                           fillColor: Colors.grey[200],
                           suffixIcon: IconButton(
-                            icon: Icon(Icons.add),
+                            icon: const Icon(Icons.add),
                             onPressed: _tags.length < 8
                                 ? () => _addTag(_tagController.text)
-                                : null, // Disable adding tags if the limit is reached
+                                : null,
                           ),
-                          labelStyle: TextStyle(
+                          labelStyle: const TextStyle(
                               fontSize: 16, fontWeight: FontWeight.w500),
                         ),
                         onChanged: (value) {
@@ -327,20 +347,19 @@ class _PostUploaderState extends State<PostUploader> {
                         },
                         onFieldSubmitted: (value) =>
                             _tags.length < 8 ? _addTag(value) : null,
-                        enabled: _tags.length <
-                            8, // Disable the field when there are 8 tags
+                        enabled: _tags.length < 8,
                       ),
                     ),
-                    SizedBox(height: 5),
+                    const SizedBox(height: 5),
                     if (_tags.isNotEmpty)
                       Wrap(
                         spacing: 8.0,
                         children: _tags.map((tag) {
                           return Chip(
                             label: Text(tag),
-                            deleteIcon: Icon(Icons.close, size: 18),
+                            deleteIcon: const Icon(Icons.close, size: 18),
                             backgroundColor: Colors.blueAccent[100],
-                            labelStyle: TextStyle(color: Colors.white),
+                            labelStyle: const TextStyle(color: Colors.white),
                             onDeleted: () => _removeTag(tag),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
@@ -348,7 +367,7 @@ class _PostUploaderState extends State<PostUploader> {
                           );
                         }).toList(),
                       ),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     ElevatedButton(
                       onPressed: _isPosting
                           ? null
@@ -360,22 +379,20 @@ class _PostUploaderState extends State<PostUploader> {
                             },
                       style: ElevatedButton.styleFrom(
                         foregroundColor: Colors.white,
-                        backgroundColor: Colors.blue, // Text color
-                        padding: EdgeInsets.symmetric(
-                            vertical: 15, horizontal: 30), // Button padding
+                        backgroundColor: Colors.blue,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 15, horizontal: 30),
                         shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(30), // Rounded corners
+                          borderRadius: BorderRadius.circular(30),
                         ),
-                        elevation: 5, // Shadow for depth
-                        shadowColor:
-                            Colors.black.withOpacity(0.25), // Shadow color
+                        elevation: 5,
+                        shadowColor: Colors.black.withValues(alpha: 0.25),
                       ),
-                      child: Text(
+                      child: const Text(
                         'Post',
                         style: TextStyle(
-                          fontSize: 18, // Text size
-                          fontWeight: FontWeight.bold, // Bold text
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     )
@@ -384,7 +401,7 @@ class _PostUploaderState extends State<PostUploader> {
               ),
             ),
           ),
-          if (_isPosting) LoadingAnimationOverLay()
+          if (_isPosting) const LoadingAnimationOverLay()
         ],
       ),
     );

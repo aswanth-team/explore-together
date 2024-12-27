@@ -208,14 +208,13 @@ class SentMessagePageState extends State<SentMessagePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notification Page'),
-        backgroundColor: Colors.blueAccent,
-      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
+            const SizedBox(
+              height: 20,
+            ),
             // Switch for sending to all users
             SwitchListTile(
               title: const Text(

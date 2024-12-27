@@ -41,21 +41,20 @@ dependencies:
   firebase_core: ^3.8.1
   cloudinary_public: ^0.23.1
   lottie: ^3.2.0
-  cached_network_image: ^3.4.1
+  cached_network_image: ^3.4.0
   cupertino_icons: ^1.0.8
   string_similarity: ^2.1.1
-  path: ^1.9.0
-  sqflite: ^2.4.1
   connectivity_plus: ^6.1.1
   provider: ^6.1.2
-  rxdart: ^0.28.0
   fluttertoast: ^8.2.10
   mockito: ^5.4.4
   flutter_gemini: ^3.0.0
   onesignal_flutter: ^5.2.9
   http: ^1.2.2
   shared_preferences: ^2.3.4
-
+  intl: ^0.20.1
+  flutter_launcher_icons: ^0.14.2
+  rxdart: ^0.28.0
 
 dev_dependencies:
   flutter_test:

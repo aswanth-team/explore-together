@@ -26,15 +26,18 @@ class UserAuthServices {
         email: email,
         password: password,
       );
+
+      int aadharInt = int.parse(aadharno);
+      int phonenoInt = int.parse(phoneno);
       String userUid = userCredential.user?.uid ?? '';
       await firestore.collection('user').doc(userUid).set({
         'username': username,
-        'phoneno': phoneno,
+        'phoneno': phonenoInt,
         'email': email,
         'dob': dob,
         'gender': gender,
         'fullname': fullname,
-        'aadharno': aadharno,
+        'aadharno': aadharInt,
         'tripimages': null,
         'facebook': null,
         'instagram': null,
@@ -46,7 +49,8 @@ class UserAuthServices {
         'location': location,
         'following': null,
         'notifications': null,
-        'onId': null
+        'onId': null,
+        'joinAt': FieldValue.serverTimestamp(),
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -90,17 +94,28 @@ class UserAuthServices {
         conflicts.add("Email");
       }
 
+      final adminEmailSnapshot = await firestore
+          .collection('admin')
+          .where('email', isEqualTo: email)
+          .get();
+      if (adminEmailSnapshot.docs.isNotEmpty) {
+        conflicts.add("Email");
+      }
+
+      int mobileInt = int.parse(mobile);
       final mobileSnapshot = await firestore
           .collection('user')
-          .where('phoneno', isEqualTo: mobile)
+          .where('phoneno', isEqualTo: mobileInt)
           .get();
       if (mobileSnapshot.docs.isNotEmpty) {
         conflicts.add("Mobile number");
       }
 
+      String cleanedAadhar = aadharno.replaceAll(RegExp(r'\D'), '');
+      int aadharInt = int.parse(cleanedAadhar);
       final aadharSnapshot = await firestore
           .collection('user')
-          .where('aadharno', isEqualTo: aadharno)
+          .where('aadharno', isEqualTo: aadharInt)
           .get();
       if (aadharSnapshot.docs.isNotEmpty) {
         conflicts.add("Aadhar number");
@@ -122,7 +137,7 @@ class UserAuthServices {
           .get();
 
       if (userSnapshot.docs.isNotEmpty) {
-        return userSnapshot.docs.first.id; // Return user ID
+        return userSnapshot.docs.first.id;
       }
 
       final QuerySnapshot emailSnapshot = await firestore
@@ -132,17 +147,39 @@ class UserAuthServices {
           .get();
 
       if (emailSnapshot.docs.isNotEmpty) {
-        return emailSnapshot.docs.first.id; // Return user ID
+        return emailSnapshot.docs.first.id;
       }
 
+      final QuerySnapshot adminEmailSnapshot = await firestore
+          .collection('admin')
+          .where('email', isEqualTo: identifier)
+          .limit(1)
+          .get();
+
+      if (adminEmailSnapshot.docs.isNotEmpty) {
+        return adminEmailSnapshot.docs.first.id;
+      }
+
+      int phoneNoInt = int.parse(identifier);
       final QuerySnapshot phoneSnapshot = await firestore
           .collection('user')
-          .where('phoneno', isEqualTo: identifier)
+          .where('phoneno', isEqualTo: phoneNoInt)
           .limit(1)
           .get();
 
       if (phoneSnapshot.docs.isNotEmpty) {
-        return phoneSnapshot.docs.first.id; // Return user ID
+        return phoneSnapshot.docs.first.id;
+      }
+
+      int aadharInt = int.parse(identifier);
+      final QuerySnapshot aadharSnapshot = await firestore
+          .collection('user')
+          .where('aadharno', isEqualTo: aadharInt)
+          .limit(1)
+          .get();
+
+      if (aadharSnapshot.docs.isNotEmpty) {
+        return aadharSnapshot.docs.first.id;
       }
 
       return null;

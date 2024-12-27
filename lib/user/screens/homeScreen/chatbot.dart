@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gemini/flutter_gemini.dart';
 import 'dart:developer';
 
-const apiKey = 'AIzaSyAwjcN3Aei78CJ6YP2Ok-W47i-Z_5k_5EE';
-
 class ChatPopup extends StatefulWidget {
   const ChatPopup({super.key});
 
@@ -16,6 +14,52 @@ class ChatPopupState extends State<ChatPopup> {
   final List<Map<String, String>> _chatHistory = [];
   bool _isLoading = false;
 
+  final String instruction = '''
+    "system_instruction": "You are Explore AI, an intelligent assistant for the Explore Together application. Your primary role is to assist users in finding travel companions. that the main aim of the aplication is to make buddies to solo traveller who can travel with a group. You must be give the response for 'user_input' don't. and give simple and understating response",
+      "user_details": {
+        "fields": [
+          "User Name ",
+          "User Age",
+          "Preferred Language",
+          "Current Location"
+        ]
+      },
+      "application_details": {
+        "features": [
+          "Search for Travel Buddies: Find others with similar destinations and interests.",
+          "Chat Feature: Communicate with travel companions within the app.",
+          "Interest-Based Matchmaking: Match with users based on travel preferences and hobbies."
+        ]
+      },
+      "navigation_instructions": {
+    "examples": [
+      {
+        "feature": "Find Travel Buddies",
+        "steps": [
+          "Open the app.",
+          "Search your desired location in the Home section.",
+          "Browse the list of potential matches and start chatting with them."
+        ]
+      },
+      {
+        "feature": "Edit Profile",
+        "steps": [
+          "Go to your profile.",
+          "Tap 'Edit Profile' or go to 'Settings > Account Management > Edit Profile'."
+        ]
+      },
+      {
+        "feature": "Change Password",
+        "steps": [
+          "Go to your profile.",
+          "Tap 'Settings > Account Management > Change Password'."
+        ]
+      }
+    ]
+  }
+    
+  ''';
+
   void _sendMessage(String userMessage) async {
     if (userMessage.trim().isEmpty) return;
 
@@ -25,13 +69,11 @@ class ChatPopupState extends State<ChatPopup> {
     });
     try {
       final gemini = Gemini.instance;
-      const systemPrompt = 'Your name is Explore Ai';
-      final userDetails = {'username': 'Ajmal'};
+
       final conversation = [
-        Content(parts: [
-          Part.text(
-              'system_prompt: $systemPrompt, userDetails: $userDetails, user_input: $userMessage')
-        ], role: 'user'),
+        Content(
+            parts: [Part.text('$instruction , "user_input" : $userMessage')],
+            role: 'user'),
         ..._chatHistory
             .where((msg) => msg['role'] == 'model')
             .map((msg) => Content(parts: [

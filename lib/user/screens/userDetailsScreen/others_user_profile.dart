@@ -6,7 +6,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../utils/app_colors.dart';
 import '../../../utils/loading.dart';
-import '../chatScreen/chating_screen.dart';
+import '../chat_&_group/chatScreen/chating_screen.dart';
 import '../followersScreen/followers_screen.dart';
 import 'post&trip/post&trip/other_user_posts.dart';
 import 'post&trip/post&trip/other_user_tripimage.dart';
@@ -267,7 +267,7 @@ class OtherProfilePageState extends State<OtherProfilePage> {
                             ),
                             child: CircleAvatar(
                               radius: 30,
-                              backgroundImage: NetworkImage(
+                              backgroundImage: CachedNetworkImageProvider(
                                   userImage), // Use NetworkImage instead of AssetImage
                               backgroundColor: Colors.black,
                             ),
@@ -279,10 +279,8 @@ class OtherProfilePageState extends State<OtherProfilePage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment
-                                    .center, // Center the row content
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  // Column for "Posts"
                                   GestureDetector(
                                     onTap: () {
                                       Navigator.push(
@@ -295,8 +293,7 @@ class OtherProfilePageState extends State<OtherProfilePage> {
                                       );
                                     },
                                     child: Material(
-                                      color: Colors
-                                          .transparent, // Ensure no visual change
+                                      color: Colors.transparent,
                                       child: Column(
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
@@ -321,55 +318,45 @@ class OtherProfilePageState extends State<OtherProfilePage> {
                                       ),
                                     ),
                                   ),
-
                                   const SizedBox(width: 30),
                                   Column(
-                                    mainAxisAlignment: MainAxisAlignment
-                                        .center, // Center the content vertically in the column
-                                    crossAxisAlignment: CrossAxisAlignment
-                                        .center, // Align content to the center horizontally
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Text(
-                                        '$totalPosts', // The count (number) at the top
+                                        '$totalPosts',
                                         style: const TextStyle(
-                                          fontSize:
-                                              22, // Larger font size for the count
+                                          fontSize: 22,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                       const Text(
-                                        'Posts', // Label below the count
+                                        'Posts',
                                         style: TextStyle(
-                                          fontSize:
-                                              12, // Smaller font size for the label
+                                          fontSize: 12,
                                           fontWeight: FontWeight.normal,
                                         ),
                                       ),
                                     ],
                                   ),
-
                                   const SizedBox(width: 30),
-
-                                  // Column for "Completed"
                                   Column(
-                                    mainAxisAlignment: MainAxisAlignment
-                                        .center, // Center the content vertically in the column
-                                    crossAxisAlignment: CrossAxisAlignment
-                                        .center, // Align content to the center horizontally
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Text(
-                                        '$completedPosts', // The count (number) at the top
+                                        '$completedPosts',
                                         style: const TextStyle(
-                                          fontSize:
-                                              22, // Larger font size for the count
+                                          fontSize: 22,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                       const Text(
-                                        'Completed', // Label below the count
+                                        'Completed',
                                         style: TextStyle(
-                                          fontSize:
-                                              12, // Smaller font size for the label
+                                          fontSize: 12,
                                           fontWeight: FontWeight.normal,
                                         ),
                                       ),
@@ -383,7 +370,6 @@ class OtherProfilePageState extends State<OtherProfilePage> {
                       ],
                     ),
                   ),
-                  // User Details
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
@@ -407,7 +393,6 @@ class OtherProfilePageState extends State<OtherProfilePage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Instagram Icon
                       if ((profileData['instagram']?.isNotEmpty ?? false))
                         IconButton(
                           onPressed: () {
@@ -423,8 +408,6 @@ class OtherProfilePageState extends State<OtherProfilePage> {
                         ),
                       if ((profileData['instagram']?.isNotEmpty ?? false))
                         const SizedBox(width: 6),
-
-                      // Twitter (X) Icon
                       if ((profileData['x']?.isNotEmpty ?? false))
                         IconButton(
                           onPressed: () {
@@ -440,8 +423,6 @@ class OtherProfilePageState extends State<OtherProfilePage> {
                         ),
                       if ((profileData['x']?.isNotEmpty ?? false))
                         const SizedBox(width: 6),
-
-                      // Facebook Icon
                       if ((profileData['facebook']?.isNotEmpty ?? false))
                         IconButton(
                           onPressed: () {
@@ -457,59 +438,47 @@ class OtherProfilePageState extends State<OtherProfilePage> {
                         ),
                     ],
                   ),
-
                   const SizedBox(
                     height: 10,
                   ),
-
                   Center(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Create a container to wrap the buttons and set its width to 95% of the device width
                         SizedBox(
-                          width: MediaQuery.of(context).size.width *
-                              0.95, // 95% of the device width
+                          width: MediaQuery.of(context).size.width * 0.95,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // Edit Profile button
                               SizedBox(
-                                width: MediaQuery.of(context).size.width *
-                                    0.45, // 45% of the width for each button
+                                width: MediaQuery.of(context).size.width * 0.45,
                                 child: ElevatedButton(
                                   onPressed: _toggleFollow,
                                   style: ElevatedButton.styleFrom(
                                     foregroundColor: Colors.black,
-                                    backgroundColor: Colors
-                                        .white, // Set background color to white
+                                    backgroundColor: Colors.white,
                                     side: const BorderSide(
                                       color: Colors.black,
-                                      width:
-                                          0.3, // Decreased the border width to 1
+                                      width: 0.3,
                                     ),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(
-                                          5), // Decreased border radius
+                                      borderRadius: BorderRadius.circular(5),
                                     ),
                                   ),
                                   child: Text(
                                       isFollowing ? "Following" : "Follow"),
                                 ),
                               ),
-                              const SizedBox(
-                                  width: 5), // Add spacing between the buttons
+                              const SizedBox(width: 5),
                               // Settings button
                               SizedBox(
-                                width: MediaQuery.of(context).size.width *
-                                    0.45, // 45% of the width for each button
+                                width: MediaQuery.of(context).size.width * 0.45,
                                 child: ElevatedButton(
                                   onPressed: () async {
                                     try {
                                       final chatRoomId =
                                           await _getOrCreateChatRoom();
-
-                                      // Navigate to the ChatScreen
+                                      if (!context.mounted) return;
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -530,16 +499,13 @@ class OtherProfilePageState extends State<OtherProfilePage> {
                                   },
                                   style: ElevatedButton.styleFrom(
                                     foregroundColor: Colors.black,
-                                    backgroundColor: Colors
-                                        .white, // Set background color to white
+                                    backgroundColor: Colors.white,
                                     side: const BorderSide(
                                       color: Colors.black,
-                                      width:
-                                          0.3, // Decreased the border width to 1
+                                      width: 0.3,
                                     ),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(
-                                          5), // Decreased border radius
+                                      borderRadius: BorderRadius.circular(5),
                                     ),
                                   ),
                                   child: const Text("Message"),
@@ -551,7 +517,6 @@ class OtherProfilePageState extends State<OtherProfilePage> {
                       ],
                     ),
                   ),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16.0),
                     child: Row(
@@ -583,7 +548,6 @@ class OtherProfilePageState extends State<OtherProfilePage> {
                           ],
                         ),
                         const SizedBox(width: 16),
-                        // Trip button with underline effect
                         Column(
                           children: [
                             TextButton.icon(
@@ -594,18 +558,13 @@ class OtherProfilePageState extends State<OtherProfilePage> {
                               },
                               icon: const Icon(
                                 Icons.photo_album,
-                                color: Colors
-                                    .black, // Set the color of the icon to black
+                                color: Colors.black,
                               ),
                               label: const Text(
                                 'Trip Images',
-                                style: TextStyle(
-                                    color: Colors
-                                        .black), // Set the color of the text to black
+                                style: TextStyle(color: Colors.black),
                               ),
                             ),
-
-                            // Underline when Trip Images is selected
                             if (!showPosts)
                               Container(
                                 height: 2,
@@ -625,7 +584,7 @@ class OtherProfilePageState extends State<OtherProfilePage> {
               ),
             );
           } else {
-            return const Text("No data available"); // Handle the no-data case
+            return const Text("No data available");
           }
         },
       ),

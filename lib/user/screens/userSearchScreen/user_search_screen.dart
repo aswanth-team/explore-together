@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../../services/user/user_services.dart';
@@ -99,13 +100,8 @@ class SearchPageState extends State<SearchPage> {
                 Expanded(
                   child: filteredUsers.isEmpty
                       ? const Center(child: Text("No users found"))
-                      : GridView.builder(
+                      : ListView.builder(
                           padding: EdgeInsets.zero,
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 1,
-                            childAspectRatio: 5,
-                          ),
                           itemCount: filteredUsers.length,
                           itemBuilder: (context, index) {
                             final user = filteredUsers[index];
@@ -115,8 +111,9 @@ class SearchPageState extends State<SearchPage> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                        builder: (context) => OtherProfilePage(
-                                            userId: user['userId'])),
+                                      builder: (context) => OtherProfilePage(
+                                          userId: user['userId']),
+                                    ),
                                   );
                                 } else {
                                   Navigator.push(
@@ -128,55 +125,48 @@ class SearchPageState extends State<SearchPage> {
                                   );
                                 }
                               },
-                              child: Card(
-                                margin: EdgeInsets.zero,
-                                elevation: 5,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Container(
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.all(10.0),
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color:
-                                                  AppColors.genderBorderColor(
-                                                      user['userGender']),
-                                              width: 3.0,
-                                            ),
-                                          ),
-                                          child: CircleAvatar(
-                                            backgroundImage:
-                                                NetworkImage(user['userImage']),
-                                            radius: 30,
+                              child: Container(
+                                color: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 10, horizontal: 0),
+                                child: Row(
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.all(10.0),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: AppColors.genderBorderColor(
+                                                user['userGender']),
+                                            width: 1.0,
                                           ),
                                         ),
-                                      ),
-                                      Expanded(
-                                        child: Text(
-                                          user['userName'],
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                        child: CircleAvatar(
+                                          backgroundImage:
+                                              CachedNetworkImageProvider(
+                                                  user['userImage']),
+                                          radius: 15,
                                         ),
                                       ),
-                                      const Padding(
-                                        padding: EdgeInsets.only(right: 8.0),
-                                        child: Icon(
-                                          Icons.search,
-                                          color: Colors.grey,
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        user['userName'],
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                    const Padding(
+                                      padding: EdgeInsets.only(right: 8.0),
+                                      child: Icon(
+                                        Icons.search,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             );

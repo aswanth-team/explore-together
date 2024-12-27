@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'dart:io';
 import '../../../services/cloudinary_upload.dart';
 import '../../../utils/loading.dart';
@@ -86,10 +87,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           .uploadImage(selectedImage: _selectedImage);
     }
 
+    String? formattedDob;
+    if (_dob != null) {
+      formattedDob = DateFormat('yyyy-MM-dd').format(_dob!);
+    }
+
     final updatedData = {
       'fullname': _fullNameController.text,
       'gender': _gender,
-      'dob': _dob?.toString(),
+      'dob': formattedDob,
       'location': _locationController.text,
       'userbio': _bioController.text,
       'instagram': _instagramController.text,
@@ -108,11 +114,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _isChanged = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile updated successfully!')),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile updated successfully!')),
+      );
 
-    Navigator.of(context).pop();
+      Navigator.of(context).pop();
+    }
   }
 
   @override

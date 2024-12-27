@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../../../../services/post/firebase_post.dart';
 import '../../../../../utils/loading.dart';
@@ -92,10 +93,12 @@ class UserPostsWidgetState extends State<UserPostsWidget> {
                             children: [
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  post['locationImages']?.isNotEmpty == true
-                                      ? post['locationImages'][0]
-                                      : 'https://res.cloudinary.com/dakew8wni/image/upload/v1734019072/public/postimages/mwtjtugc4ppu02vwiv49.png',
+                                child: Image(
+                                  image: CachedNetworkImageProvider(
+                                    post['locationImages']?.isNotEmpty == true
+                                        ? post['locationImages'][0]
+                                        : 'https://res.cloudinary.com/dakew8wni/image/upload/v1734019072/public/postimages/mwtjtugc4ppu02vwiv49.png',
+                                  ),
                                   fit: BoxFit.cover,
                                   height: 100,
                                   width: double.infinity,
@@ -109,10 +112,8 @@ class UserPostsWidgetState extends State<UserPostsWidget> {
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 12,
-                                      color:
-                                          Colors.black, // Ensuring color is set
-                                      height:
-                                          1.2, // Adjust line height to control spacing
+                                      color: Colors.black,
+                                      height: 1.2,
                                     ),
                                   ),
                                 ),

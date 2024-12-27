@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:explore_together/utils/loading.dart';
 import 'package:flutter/material.dart';
 import '../../../../../services/user/firebase_tripImages.dart';
 
@@ -23,7 +24,7 @@ class UserTripImagesWidgetState extends State<UserTripImagesWidget> {
       stream: UserTripImageServices().fetchUserTripImagesStream(widget.userId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: LoadingAnimation());
         }
 
         if (snapshot.hasError) {
@@ -50,9 +51,9 @@ class UserTripImagesWidgetState extends State<UserTripImagesWidget> {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3, // Three images per row
-            crossAxisSpacing: 8, // Horizontal space between items
-            mainAxisSpacing: 8, // Vertical space between items
+            crossAxisCount: 3,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
           ),
           itemCount: tripImages.length,
           itemBuilder: (context, index) {
@@ -66,8 +67,9 @@ class UserTripImagesWidgetState extends State<UserTripImagesWidget> {
                       child: Stack(
                         children: [
                           Center(
-                            child: Image.network(
-                              tripImages[index],
+                            child: Image(
+                              image:
+                                  CachedNetworkImageProvider(tripImages[index]),
                               fit: BoxFit.contain,
                               width: MediaQuery.of(context).size.width,
                               height: MediaQuery.of(context).size.height,
@@ -95,20 +97,13 @@ class UserTripImagesWidgetState extends State<UserTripImagesWidget> {
               },
               child: Stack(
                 children: [
-                  CachedNetworkImage(
-                    imageUrl: tripImages[index], // URL of the image
-                    fit: BoxFit
-                        .cover, // Adjust the image size to cover the available space
-                    width: double
-                        .infinity, // Stretch image to fill the available width
-                    height: double
-                        .infinity, // Stretch image to fill the available height
-                    placeholder: (context, url) => const Center(
-                        child:
-                            CircularProgressIndicator()), // Placeholder while loading
-                    errorWidget: (context, url, error) => const Center(
-                        child:
-                            Icon(Icons.error)), // Error widget if loading fails
+                  Image(
+                    image: CachedNetworkImageProvider(
+                      tripImages[index],
+                    ),
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
                   ),
                 ],
               ),

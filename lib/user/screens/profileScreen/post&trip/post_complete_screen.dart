@@ -17,12 +17,14 @@ class PostCompleteScreen extends StatefulWidget {
 class PostCompleteScreenState extends State<PostCompleteScreen> {
   final TextEditingController tripBuddiesController = TextEditingController();
   final TextEditingController visitedPlacesController = TextEditingController();
+  final TextEditingController tripDurationController = TextEditingController();
 
   final List<String> tripBuddies = [];
   final Map<String, Map<String, String>> userDetails = {};
   final List<String> visitedPlaces = [];
   String? tripFeedback;
   double? tripRating;
+  int? tripCompletedDuration;
 
   bool visitedPlacesDisabled = false;
 
@@ -38,6 +40,7 @@ class PostCompleteScreenState extends State<PostCompleteScreen> {
   void dispose() {
     tripBuddiesController.dispose();
     visitedPlacesController.dispose();
+    tripDurationController.dispose();
     super.dispose();
   }
 
@@ -51,9 +54,8 @@ class PostCompleteScreenState extends State<PostCompleteScreen> {
       return;
     }
 
-    _setLoading(true); // Start loading
+    _setLoading(true);
     try {
-      // Check if the username exists in the 'user' collection
       QuerySnapshot query = await FirebaseFirestore.instance
           .collection('user')
           .where('username', isEqualTo: tag)
@@ -84,7 +86,7 @@ class PostCompleteScreenState extends State<PostCompleteScreen> {
     } catch (e) {
       print(e);
     } finally {
-      _setLoading(false); 
+      _setLoading(false);
       controller.clear();
     }
   }
@@ -100,7 +102,7 @@ class PostCompleteScreenState extends State<PostCompleteScreen> {
   void _removeTag(String tag, List<String> list) {
     setState(() {
       list.remove(tag);
-      userDetails.remove(tag); // Also remove user info
+      userDetails.remove(tag);
     });
   }
 
@@ -130,18 +132,19 @@ class PostCompleteScreenState extends State<PostCompleteScreen> {
         'tripRating': tripRating?.toInt(),
         'tripBuddies': tripBuddiesIds, // Save only user IDs
         'visitedPlaces': visitedPlaces,
+        'tripCompletedDuration': tripCompletedDuration,
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Trip completed and data saved')),
+          const SnackBar(content: Text('Trip completed')),
         );
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to save trip details')),
+          const SnackBar(content: Text('Failed')),
         );
       }
     }
@@ -218,135 +221,211 @@ class PostCompleteScreenState extends State<PostCompleteScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Complete Trip Details')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Trip Rating
-            RatingBar.builder(
-              initialRating: tripRating ?? 0,
-              minRating: 1,
-              itemSize: 30,
-              direction: Axis.horizontal,
-              allowHalfRating: true,
-              itemBuilder: (context, _) =>
-                  const Icon(Icons.star, color: Colors.yellow),
-              onRatingUpdate: (rating) => setState(() => tripRating = rating),
-            ),
-            const SizedBox(height: 10),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                // Trip Rating
+                RatingBar.builder(
+                  initialRating: tripRating ?? 0,
+                  minRating: 1,
+                  itemSize: 30,
+                  direction: Axis.horizontal,
+                  allowHalfRating: true,
+                  itemBuilder: (context, _) =>
+                      const Icon(Icons.star, color: Colors.yellow),
+                  onRatingUpdate: (rating) =>
+                      setState(() => tripRating = rating),
+                ),
+                const SizedBox(height: 10),
 
-            // Trip Buddies Input
-            TextField(
-              controller: tripBuddiesController,
-              decoration: const InputDecoration(
-                labelText: 'Trip Buddies (comma separated)',
-              ),
-              onChanged: (value) {
-                if (value.endsWith(",") || value.endsWith("\n")) {
-                  _handleTagInput(value, tripBuddiesController, tripBuddies);
-                }
-              },
-              onSubmitted: (value) {
-                _handleTagInput(value, tripBuddiesController, tripBuddies);
-              },
-            ),
-            Wrap(
-              children: tripBuddies.map((tag) {
-                final userDetail = userDetails[tag];
-                final fullName = userDetail?['fullname'] ?? "Unknown";
-                final profileImage = userDetail?['userimage'] ?? "";
-
-                return Chip(
-                  labelPadding: const EdgeInsets.all(4.0),
-                  avatar: profileImage.isNotEmpty
-                      ? CircleAvatar(
-                          backgroundImage: NetworkImage(profileImage),
-                          radius: 12, // Small user image size
-                        )
-                      : const CircleAvatar(
-                          backgroundColor: Colors.grey,
-                          radius: 12, // Small default avatar size
-                          child: Icon(Icons.person, size: 14),
-                        ),
-                  label: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Username (with reduced text size)
-                      Flexible(
-                        child: Text(
-                          tag,
-                          style: const TextStyle(
-                              fontSize: 7,
-                              fontWeight:
-                                  FontWeight.bold), // Smaller font for username
-                          overflow: TextOverflow
-                              .ellipsis, // Ensure long text is truncated
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      // Full Name (smaller font size)
-                      Flexible(
-                        child: Text(
-                          fullName,
-                          style: const TextStyle(
-                              fontSize: 5,
-                              color: Colors.grey), // Smaller font for fullname
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                // Trip Buddies Input
+                TextField(
+                  controller: tripBuddiesController,
+                  decoration: const InputDecoration(
+                    labelText: 'Trip Buddies (comma separated)',
                   ),
-                  deleteIcon: const Icon(Icons.close, size: 16),
-                  onDeleted: () => _removeTag(tag, tripBuddies),
-                );
-              }).toList(),
-            ),
+                  onChanged: (value) {
+                    if (value.endsWith(",") || value.endsWith("\n")) {
+                      _handleTagInput(
+                          value, tripBuddiesController, tripBuddies);
+                    }
+                  },
+                  onSubmitted: (value) {
+                    _handleTagInput(value, tripBuddiesController, tripBuddies);
+                  },
+                ),
+                Wrap(
+                  children: tripBuddies.map((tag) {
+                    final userDetail = userDetails[tag];
+                    final fullName = userDetail?['fullname'] ?? "Unknown";
+                    final profileImage = userDetail?['userimage'] ?? "";
 
-            // Visited Places Input
-            TextField(
-              controller: visitedPlacesController,
-              decoration: const InputDecoration(
-                labelText: 'Visited Places (comma separated)',
-              ),
-              enabled: !visitedPlacesDisabled,
-              onChanged: (value) {
-                if (value.endsWith(",") || value.endsWith("\n")) {
-                  _handleLocTagInput(
-                      value, visitedPlacesController, visitedPlaces);
-                  _checkVisitedPlacesLimit();
-                }
-              },
-              onSubmitted: (value) {
-                if (!visitedPlacesDisabled) {
-                  _handleLocTagInput(
-                      value, visitedPlacesController, visitedPlaces);
-                  _checkVisitedPlacesLimit();
-                }
-              },
-            ),
-            Wrap(
-              children: visitedPlaces.map((tag) {
-                return Chip(
-                  label: Text(tag),
-                  deleteIcon: const Icon(Icons.close),
-                  onDeleted: () => _removeLocTag(tag, visitedPlaces),
-                );
-              }).toList(),
-            ),
+                    return Chip(
+                      labelPadding: const EdgeInsets.all(4.0),
+                      avatar: profileImage.isNotEmpty
+                          ? CircleAvatar(
+                              backgroundImage: NetworkImage(profileImage),
+                              radius: 12, // Small user image size
+                            )
+                          : const CircleAvatar(
+                              backgroundColor: Colors.grey,
+                              radius: 12, // Small default avatar size
+                              child: Icon(Icons.person, size: 14),
+                            ),
+                      label: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Username (with reduced text size)
+                          Flexible(
+                            child: Text(
+                              tag,
+                              style: const TextStyle(
+                                  fontSize: 7,
+                                  fontWeight: FontWeight
+                                      .bold), // Smaller font for username
+                              overflow: TextOverflow
+                                  .ellipsis, // Ensure long text is truncated
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          // Full Name (smaller font size)
+                          Flexible(
+                            child: Text(
+                              fullName,
+                              style: const TextStyle(
+                                  fontSize: 5,
+                                  color:
+                                      Colors.grey), // Smaller font for fullname
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      deleteIcon: const Icon(Icons.close, size: 16),
+                      onDeleted: () => _removeTag(tag, tripBuddies),
+                    );
+                  }).toList(),
+                ),
 
-            // Trip Feedback Input
-            TextField(
-              decoration: const InputDecoration(labelText: 'Trip Feedback'),
-              onChanged: (value) => tripFeedback = value,
-            ),
+                // Visited Places Input
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: visitedPlacesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Visited Places (comma separated)',
+                        ),
+                        enabled: !visitedPlacesDisabled,
+                        onChanged: (value) {
+                          if (value.endsWith(",") || value.endsWith("\n")) {
+                            _handleLocTagInput(
+                                value, visitedPlacesController, visitedPlaces);
+                            _checkVisitedPlacesLimit();
+                          }
+                        },
+                        onSubmitted: (value) {
+                          if (!visitedPlacesDisabled) {
+                            _handleLocTagInput(
+                                value, visitedPlacesController, visitedPlaces);
+                            _checkVisitedPlacesLimit();
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      onPressed: () async {
+                        _setLoading(true);
+                        try {
+                          DocumentSnapshot postSnapshot =
+                              await FirebaseFirestore.instance
+                                  .collection('post')
+                                  .doc(widget.postId)
+                                  .get();
 
-            // Complete Button
-            ElevatedButton(
-              onPressed: isLoading ? null : _onComplete,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              child: const Text('Complete'),
+                          if (postSnapshot.exists) {
+                            List<dynamic> planToVisitPlaces =
+                                postSnapshot['planToVisitPlaces']
+                                    as List<dynamic>;
+
+                            setState(() {
+                              visitedPlaces.addAll(
+                                planToVisitPlaces
+                                    .map((place) => place.toString())
+                                    .where((place) =>
+                                        !visitedPlaces.contains(place)),
+                              );
+                            });
+                            _checkVisitedPlacesLimit();
+                          } else {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Post not found")),
+                              );
+                            }
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content:
+                                      Text("Error fetching planned places")),
+                            );
+                          }
+                        } finally {
+                          _setLoading(false);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue),
+                      child: const Text(
+                        'Same as \n Planned',
+                        style: TextStyle(color: Colors.white, fontSize: 10),
+                      ),
+                    ),
+                  ],
+                ),
+                Wrap(
+                  children: visitedPlaces.map((tag) {
+                    return Chip(
+                      label: Text(tag),
+                      deleteIcon: const Icon(Icons.close),
+                      onDeleted: () => _removeLocTag(tag, visitedPlaces),
+                    );
+                  }).toList(),
+                ),
+
+                TextField(
+                  decoration: const InputDecoration(labelText: 'Trip Feedback'),
+                  onChanged: (value) => tripFeedback = value,
+                ),
+
+                TextField(
+                  controller: tripDurationController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Trip Duration (in Days)',
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      tripCompletedDuration = int.tryParse(value);
+                    });
+                  },
+                ),
+
+                ElevatedButton(
+                  onPressed: isLoading ? null : _onComplete,
+                  style:
+                      ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                  child: const Text('Complete'),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

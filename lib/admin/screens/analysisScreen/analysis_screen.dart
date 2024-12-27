@@ -17,9 +17,6 @@ class AnalysisPageState extends State<AnalysisPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Analysis"),
-      ),
       body: FutureBuilder(
         future: _fetchAnalysisData(),
         builder: (context, snapshot) {
@@ -111,6 +108,9 @@ class AnalysisPageState extends State<AnalysisPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const SizedBox(
+              height: 40,
+            ),
             Center(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,

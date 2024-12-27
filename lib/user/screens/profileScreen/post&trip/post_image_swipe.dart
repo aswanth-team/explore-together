@@ -1,3 +1,5 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:explore_together/utils/loading.dart';
 import 'package:flutter/material.dart';
 
 class ImageCarousel extends StatefulWidget {
@@ -23,10 +25,13 @@ class _ImageCarouselState extends State<ImageCarousel> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(15.0),
-            child: Image.network(
-              widget.locationImages[currentIndex],
+            child: CachedNetworkImage(
+              imageUrl: widget.locationImages[currentIndex],
               fit: BoxFit.cover,
               width: double.infinity,
+              placeholder: (context, url) =>
+                  const Center(child: LoadingAnimation()),
+              errorWidget: (context, url, error) => const Icon(Icons.error),
             ),
           ),
         ),

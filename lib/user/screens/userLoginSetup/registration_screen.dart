@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:pinput/pinput.dart';
 //import 'dart:math';
 import '../../../services/user/firebase_user_auth.dart';
@@ -166,19 +167,46 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     try {
       await UserAuthServices().userRegisterInFirebase(
         context: context,
-        username: usernameController.text,
-        fullname: fullNameController.text,
+        username: usernameController.text.trim(),
+        fullname: fullNameController.text.trim(),
         dob: dobController.text,
         gender: genderController,
-        phoneno: mobileNumberController.text,
-        email: emailController.text,
-        password: passwordController.text,
-        aadharno: aadharController.text,
-        location: locationController.text,
+        phoneno: mobileNumberController.text.trim(),
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+        aadharno: aadharController.text.trim(),
+        location: locationController.text.trim(),
       );
     } catch (e) {
       throw Exception("Failed to store user details: $e");
     }
+  }
+
+  String? _validateAadhar(String value) {
+    String cleanedValue = value.replaceAll(' ', '');
+    if (cleanedValue.isEmpty) {
+      return "Please enter your Aadhar number";
+    }
+    if (!RegExp(r'^[0-9]+$').hasMatch(cleanedValue)) {
+      return "Aadhar number must only contain digits";
+    }
+    if (cleanedValue.length != 12) {
+      return "Aadhar number must be 12 digits long";
+    }
+    return null;
+  }
+
+  String _formatAadhar(String value) {
+    String cleanedValue = value.replaceAll(RegExp(r'\D'), '');
+    if (cleanedValue.length > 12) {
+      cleanedValue = cleanedValue.substring(0, 12);
+    }
+    String formattedValue = cleanedValue.replaceAllMapped(
+      RegExp(r'(\d{4})(?=\d)'),
+      (match) => '${match.group(1)} ',
+    );
+
+    return formattedValue;
   }
 
   @override
@@ -306,7 +334,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         ),
         const SizedBox(height: 20),
         SizedBox(
-          width: 350, // Set width for the dropdown
+          width: 350,
           child: DropdownButtonFormField<String>(
             value: _gender,
             decoration: _inputDecoration("Gender", Icons.person_outline),
@@ -335,7 +363,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         ),
         const SizedBox(height: 20),
         SizedBox(
-          width: 350, // Set width for the DOB field
+          width: 350,
           child: TextFormField(
             controller: dobController,
             readOnly: true,
@@ -352,7 +380,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         ),
         const SizedBox(height: 20),
         SizedBox(
-          width: 350, // Set the desired width
+          width: 350,
           child: TextFormField(
             controller: locationController,
             style: const TextStyle(color: Colors.white),
@@ -447,11 +475,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             controller: aadharController,
             style: const TextStyle(color: Colors.white),
             decoration: _inputDecoration("Aadhar Number", Icons.credit_card),
+            keyboardType: TextInputType.number,
+            onChanged: (value) {
+              setState(() {
+                aadharError = _validateAadhar(value);
+                String formattedValue = _formatAadhar(value);
+                aadharController.text = formattedValue;
+                aadharController.selection = TextSelection.fromPosition(
+                    TextPosition(offset: aadharController.text.length));
+              });
+            },
             validator: (value) {
-              if (value == null || value.isEmpty) {
-                return "Please enter your Aadhar number";
+              if (aadharError != null) {
+                return aadharError;
               }
-              return aadharError;
+              return null;
             },
           ),
         ),
@@ -469,6 +507,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           child: TextFormField(
             controller: mobileNumberController,
             style: const TextStyle(color: Colors.white),
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              LengthLimitingTextInputFormatter(10),
+              FilteringTextInputFormatter.digitsOnly,
+            ],
             decoration: _inputDecoration("Mobile Number", Icons.phone),
             validator: (value) {
               if (value == null || value.isEmpty) {
@@ -492,10 +535,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           child: TextFormField(
             controller: emailController,
             style: const TextStyle(color: Colors.white),
+            keyboardType: TextInputType.emailAddress,
             decoration: _inputDecoration("Email", Icons.email),
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return "Please enter your email";
+              }
+              final emailRegex =
+                  RegExp(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$");
+              if (!emailRegex.hasMatch(value)) {
+                return "Please enter a valid email address";
               }
               return emailError;
             },

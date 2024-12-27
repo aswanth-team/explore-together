@@ -1,16 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gemini/flutter_gemini.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
-
-import 'admin/screens/admin_screen.dart';
 import 'firebase_options.dart';
-import 'login_screen.dart';
-import 'user/screens/user_screen.dart';
+import 'splash_screen.dart';
 
-const apiKey = '-GEMINI API-';
+const apiKey = 'AIzaSyAwjcN3Aei78CJ6YP2Ok-W47i-Z_5k_5EE';
 
 Future<void> initializeServices() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,41 +31,18 @@ Future<void> initializeServices() async {
   Gemini.init(apiKey: apiKey);
 }
 
-Future<Widget> determineHomeScreen() async {
-  final user = FirebaseAuth.instance.currentUser;
-
-  if (user != null) {
-    final adminSnapshot = await FirebaseFirestore.instance
-        .collection('admin')
-        .where('email', isEqualTo: user.email)
-        .get();
-
-    if (adminSnapshot.docs.isNotEmpty) {
-      return const AdminScreen();
-    } else {
-      return const UserScreen();
-    }
-  } else {
-    return const LoginScreen();
-  }
-}
-
 void main() async {
   await initializeServices();
-  final homeScreen = await determineHomeScreen();
-
-  runApp(MyApp(home: homeScreen));
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  final Widget home;
-
-  const MyApp({super.key, required this.home});
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: home,
+    return const MaterialApp(
+      home: SplashScreen(),
       debugShowCheckedModeBanner: false,
     );
   }

@@ -142,7 +142,7 @@ class ProfilePageState extends State<ProfilePage> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => SettingsPage()),
+                MaterialPageRoute(builder: (context) => const SettingsPage()),
               );
             },
           ),
@@ -211,10 +211,10 @@ class ProfilePageState extends State<ProfilePage> {
                                             imageUrl:
                                                 userImage, // URL of the image
                                             placeholder: (context, url) =>
-                                                LoadingAnimation(), // Placeholder widget while loading
+                                                const LoadingAnimation(), // Placeholder widget while loading
                                             errorWidget: (context, url,
                                                     error) =>
-                                                Icon(Icons
+                                                const Icon(Icons
                                                     .error), // Fallback error widget if loading fails
                                             fit: BoxFit
                                                 .cover, // Adjust the image size to cover the available space
@@ -234,15 +234,14 @@ class ProfilePageState extends State<ProfilePage> {
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: AppColors.genderBorderColor(
-                                    profileData['gender'] ??
-                                        ''), // Dynamically set border color
-                                width: 2, // Border width
+                                    profileData['gender'] ?? ''),
+                                width: 2,
                               ),
                             ),
                             child: CircleAvatar(
                               radius: 30,
-                              backgroundImage: CachedNetworkImageProvider(
-                                  userImage), // Use NetworkImage instead of AssetImage
+                              backgroundImage:
+                                  CachedNetworkImageProvider(userImage),
                               backgroundColor: Colors.black,
                             ),
                           ),
@@ -584,10 +583,11 @@ class ProfilePageState extends State<ProfilePage> {
                   ),
                   if (showPosts)
                     UserPostsWidget(
-                        userId: FirebaseAuth.instance.currentUser!.uid)
-                  else
+                        userId: FirebaseAuth.instance.currentUser!.uid),
+                  if (!showPosts)
                     UserTripImagesWidget(
-                        userId: FirebaseAuth.instance.currentUser!.uid)
+                        userId: FirebaseAuth.instance.currentUser!.uid),
+                  const SizedBox(height: 10),
                 ],
               ),
             );
@@ -600,50 +600,49 @@ class ProfilePageState extends State<ProfilePage> {
         onPressed: () {
           showModalBottomSheet(
             context: context,
-            backgroundColor: Colors.white, // Set a background color
-            shape: RoundedRectangleBorder(
+            backgroundColor: Colors.white,
+            shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ), // Rounded top corners for a smooth look
+            ),
             builder: (BuildContext context) {
               return Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Add a handle to indicate it's a bottom sheet
                     Container(
                       height: 4,
                       width: 40,
-                      margin: EdgeInsets.only(bottom: 16),
+                      margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
                         color: Colors.grey[300],
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                     ListTile(
-                      leading: Icon(Icons.post_add, color: Colors.blue),
-                      title: Text("Post",
+                      leading: const Icon(Icons.post_add, color: Colors.blue),
+                      title: const Text("Post",
                           style: TextStyle(
                               fontSize: 18, fontWeight: FontWeight.w500)),
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => PostUploader()),
+                              builder: (context) => const PostUploader()),
                         );
                       },
                     ),
-                    Divider(),
+                    const Divider(),
                     ListTile(
-                      leading: Icon(Icons.image, color: Colors.green),
-                      title: Text("Uplaod Image",
+                      leading: const Icon(Icons.image, color: Colors.green),
+                      title: const Text("Uplaod Image",
                           style: TextStyle(
                               fontSize: 18, fontWeight: FontWeight.w500)),
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => ImageUploader()),
+                              builder: (context) => const ImageUploader()),
                         );
                       },
                     ),
@@ -653,12 +652,12 @@ class ProfilePageState extends State<ProfilePage> {
             },
           );
         },
-        child: const Icon(Icons.add),
         backgroundColor: Colors.blue,
         mini: true,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(50), // Makes the FAB round
+          borderRadius: BorderRadius.circular(50),
         ),
+        child: const Icon(Icons.add),
       ),
     );
   }

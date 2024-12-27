@@ -34,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
         color: Colors.white,
         fontWeight: FontWeight.bold,
       ),
-      hintStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+      hintStyle: const TextStyle(color: Color.fromRGBO(255, 255, 255, 0.7)),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: BorderSide.none,
@@ -44,301 +44,10 @@ class _LoginScreenState extends State<LoginScreen> {
         borderSide: const BorderSide(color: Colors.white, width: 2),
       ),
       prefixIcon: Icon(icon, color: Colors.white),
-      fillColor: Colors.black.withOpacity(0.3),
+      fillColor: const Color.fromRGBO(0, 0, 0, 0.3),
       filled: true,
     );
   }
-
-/*
-  void loginHandle() async {
-    setState(() {
-      identifierError = null;
-      passwordError = null;
-      _isLoading = true;
-    });
-
-    if (!_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
-
-    final identifier = identifierController.text.trim();
-    final password = passwordController.text.trim();
-
-    try {
-      QuerySnapshot adminSnapshot = await FirebaseFirestore.instance
-          .collection('admin')
-          .where('username', isEqualTo: identifier)
-          .get();
-
-      if (adminSnapshot.docs.isEmpty) {
-        adminSnapshot = await FirebaseFirestore.instance
-            .collection('admin')
-            .where('email', isEqualTo: identifier)
-            .get();
-      }
-
-      if (adminSnapshot.docs.isEmpty) {
-        adminSnapshot = await FirebaseFirestore.instance
-            .collection('admin')
-            .where('phoneno', isEqualTo: identifier)
-            .get();
-      }
-
-      if (adminSnapshot.docs.isEmpty) {
-        adminSnapshot = await FirebaseFirestore.instance
-            .collection('admin')
-            .where('aadharno', isEqualTo: identifier)
-            .get();
-      }
-
-      if (adminSnapshot.docs.isNotEmpty) {
-        final adminData =
-            adminSnapshot.docs.first.data() as Map<String, dynamic>;
-        final adminEmail = adminData['email'];
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: adminEmail,
-          password: password,
-        );
-
-        if (!mounted) return;
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const AdminScreen()),
-        );
-        return;
-      }
-      QuerySnapshot userSnapshot = await FirebaseFirestore.instance
-          .collection('user')
-          .where('username', isEqualTo: identifier)
-          .get();
-
-      if (userSnapshot.docs.isEmpty) {
-        userSnapshot = await FirebaseFirestore.instance
-            .collection('user')
-            .where('email', isEqualTo: identifier)
-            .get();
-      }
-
-      if (userSnapshot.docs.isEmpty) {
-        userSnapshot = await FirebaseFirestore.instance
-            .collection('user')
-            .where('phoneno', isEqualTo: identifier)
-            .get();
-      }
-
-      if (userSnapshot.docs.isEmpty) {
-        userSnapshot = await FirebaseFirestore.instance
-            .collection('user')
-            .where('aadharno', isEqualTo: identifier)
-            .get();
-      }
-
-      if (userSnapshot.docs.isEmpty) {
-        setState(() {
-          identifierError = 'User not found. Please recheck or sign up.';
-          _isLoading = false;
-        });
-        return;
-      }
-      final userData = userSnapshot.docs.first.data() as Map<String, dynamic>;
-      final userEmail = userData['email'];
-      final isRemoved = userData['isRemoved'] ?? false;
-
-      if (isRemoved) {
-        setState(() {
-          identifierError = 'Your account has been temporarily removed.';
-          _isLoading = false;
-        });
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          showTemporaryRemovedPopup(context);
-        });
-        return;
-      }
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: userEmail,
-        password: password,
-      );
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const UserScreen()),
-      );
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        if (e.code == 'invalid-credential') {
-          passwordError = 'Incorrect password.';
-        } else if (e.code == 'user-not-found') {
-          identifierError = 'User not found. Please recheck or sign up.';
-        } else {
-          identifierError = 'Authentication failed: ${e.message}';
-        }
-
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        identifierError = 'An error occurred: ${e.toString()}';
-        _isLoading = false;
-      });
-    }
-  } 
-  
-  
-  
-  
-  
-    void loginHandle() async {
-    setState(() {
-      identifierError = null;
-      passwordError = null;
-      _isLoading = true;
-    });
-
-    if (!_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
-
-    final identifier = identifierController.text.trim();
-    final password = passwordController.text.trim();
-
-    try {
-      QuerySnapshot adminSnapshot = await FirebaseFirestore.instance
-          .collection('admin')
-          .where('username', isEqualTo: identifier)
-          .get();
-
-      if (adminSnapshot.docs.isEmpty) {
-        adminSnapshot = await FirebaseFirestore.instance
-            .collection('admin')
-            .where('email', isEqualTo: identifier)
-            .get();
-      }
-
-      if (adminSnapshot.docs.isEmpty) {
-        adminSnapshot = await FirebaseFirestore.instance
-            .collection('admin')
-            .where('phoneno', isEqualTo: identifier)
-            .get();
-      }
-
-      if (adminSnapshot.docs.isEmpty) {
-        adminSnapshot = await FirebaseFirestore.instance
-            .collection('admin')
-            .where('aadharno', isEqualTo: identifier)
-            .get();
-      }
-
-      if (adminSnapshot.docs.isNotEmpty) {
-        final adminData =
-            adminSnapshot.docs.first.data() as Map<String, dynamic>;
-        final adminEmail = adminData['email'];
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: adminEmail,
-          password: password,
-        );
-
-        if (!mounted) return;
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const AdminScreen()),
-        );
-        return;
-      }
-      QuerySnapshot userSnapshot = await FirebaseFirestore.instance
-          .collection('user')
-          .where('username', isEqualTo: identifier)
-          .get();
-
-      if (userSnapshot.docs.isEmpty) {
-        userSnapshot = await FirebaseFirestore.instance
-            .collection('user')
-            .where('email', isEqualTo: identifier)
-            .get();
-      }
-
-      if (userSnapshot.docs.isEmpty) {
-        userSnapshot = await FirebaseFirestore.instance
-            .collection('user')
-            .where('phoneno', isEqualTo: identifier)
-            .get();
-      }
-
-      if (userSnapshot.docs.isEmpty) {
-        userSnapshot = await FirebaseFirestore.instance
-            .collection('user')
-            .where('aadharno', isEqualTo: identifier)
-            .get();
-      }
-
-      if (userSnapshot.docs.isEmpty) {
-        setState(() {
-          identifierError = 'User not found. Please recheck or sign up.';
-          _isLoading = false;
-        });
-        return;
-      }
-      final userData = userSnapshot.docs.first.data() as Map<String, dynamic>;
-      final userEmail = userData['email'];
-      final isRemoved = userData['isRemoved'] ?? false;
-
-      if (isRemoved) {
-        setState(() {
-          identifierError = 'Your account has been temporarily removed.';
-          _isLoading = false;
-        });
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          showTemporaryRemovedPopup(context);
-        });
-        return;
-      }
-
-      final userCredential =
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: userEmail,
-        password: password,
-      );
-
-      final userId = userCredential.user?.uid;
-      if (userId != null) {
-        final playerId = OneSignal.User.pushSubscription.id;
-        await FirebaseFirestore.instance
-            .collection('user')
-            .doc(userId)
-            .set({'onId': playerId}, SetOptions(merge: true));
-      }
-
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const UserScreen()),
-      );
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        if (e.code == 'invalid-credential') {
-          passwordError = 'Incorrect password.';
-        } else if (e.code == 'user-not-found') {
-          identifierError = 'User not found. Please recheck or sign up.';
-        } else {
-          identifierError = 'Authentication failed: ${e.message}';
-        }
-
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        identifierError = 'An error occurred: ${e.toString()}';
-        _isLoading = false;
-      });
-    }
-  }*/
 
   void loginHandle() async {
     setState(() {
@@ -363,26 +72,32 @@ class _LoginScreenState extends State<LoginScreen> {
       String? userEmail;
       bool isAdmin = false;
 
-      for (final field in ['username', 'email', 'phoneno', 'aadharno']) {
-        final adminQuery = await FirebaseFirestore.instance
-            .collection('admin')
-            .where(field, isEqualTo: identifier)
-            .get();
+      final adminQuery = await FirebaseFirestore.instance
+          .collection('admin')
+          .where('email', isEqualTo: identifier)
+          .get();
 
-        if (adminQuery.docs.isNotEmpty) {
-          isAdmin = true;
-          userSnapshot = adminQuery;
-          break;
-        }
+      if (adminQuery.docs.isNotEmpty) {
+        isAdmin = true;
+        userSnapshot = adminQuery;
+      } else {
+        for (final field in ['username', 'email', 'phoneno', 'aadharno']) {
+          Object queryIdentifier = identifier;
 
-        final userQuery = await FirebaseFirestore.instance
-            .collection('user')
-            .where(field, isEqualTo: identifier)
-            .get();
+          if (field == 'phoneno' || field == 'aadharno') {
+            queryIdentifier =
+                int.tryParse(identifier) ?? identifier; 
+          }
 
-        if (userQuery.docs.isNotEmpty) {
-          userSnapshot = userQuery;
-          break;
+          final userQuery = await FirebaseFirestore.instance
+              .collection('user')
+              .where(field, isEqualTo: queryIdentifier)
+              .get();
+
+          if (userQuery.docs.isNotEmpty) {
+            userSnapshot = userQuery;
+            break;
+          }
         }
       }
 
@@ -414,37 +129,20 @@ class _LoginScreenState extends State<LoginScreen> {
         password: password,
       );
 
-      // final userId = userCredential.user?.uid;
-      //  if (userId != null) {
-      //    final playerId = OneSignal.User.pushSubscription.id;
-      //     await FirebaseFirestore.instance
-      //          .collection('user')
-      //          .doc(userId)
-      //          .set({'onId': playerId}, SetOptions(merge: true));
-      //    }
-
       final userId = userCredential.user?.uid;
       if (!isAdmin && userId != null) {
         final playerId = OneSignal.User.pushSubscription.id;
-
-        // Get the document for the user
         final userDocRef =
             FirebaseFirestore.instance.collection('user').doc(userId);
         final userDocSnapshot = await userDocRef.get();
-
-        // Check if the 'onId' field exists and if it's a list, otherwise initialize an empty list
         List<String> existingPlayerIds = [];
         if (userDocSnapshot.exists) {
           final userData = userDocSnapshot.data();
           existingPlayerIds = List<String>.from(userData?['onId'] ?? []);
         }
-
-        // Add the new playerId to the list if it's not already present
         if (!existingPlayerIds.contains(playerId)) {
           existingPlayerIds.add(playerId!);
         }
-
-        // Update the user document with the new 'onId' list
         await userDocRef
             .set({'onId': existingPlayerIds}, SetOptions(merge: true));
       }
@@ -569,7 +267,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 30),
-                    // Form
                     Form(
                       key: _formKey,
                       child: Column(

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -43,8 +44,6 @@ class FollowingUsersPageState extends State<FollowingUsersPage> {
 
     if (userDoc.exists) {
       List<dynamic> followingIds = userDoc['following'] ?? [];
-
-      // Fetch the details of the following users
       List<Map<String, dynamic>> followingUsers = [];
       for (String followedUserId in followingIds) {
         DocumentSnapshot followedUserDoc = await FirebaseFirestore.instance
@@ -110,7 +109,7 @@ class FollowingUsersPageState extends State<FollowingUsersPage> {
                       onPressed: () {
                         setState(() {
                           searchController.clear();
-                          filterUsers(); // Update the filtered list after clearing the text
+                          filterUsers();
                         });
                       },
                     )
@@ -198,8 +197,9 @@ class FollowingUsersPageState extends State<FollowingUsersPage> {
                                               ),
                                             ),
                                             child: CircleAvatar(
-                                              backgroundImage: NetworkImage(
-                                                  user['userimage']),
+                                              backgroundImage:
+                                                  CachedNetworkImageProvider(
+                                                      user['userimage']),
                                               radius: 25,
                                             ),
                                           ),

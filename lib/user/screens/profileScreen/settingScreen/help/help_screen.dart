@@ -104,21 +104,18 @@ class RecoverAccountHelpPage extends StatelessWidget {
       // Get the app management data from Firestore
       DocumentSnapshot document = await FirebaseFirestore.instance
           .collection('Manage')
-          .doc('appData') // assuming the document is named 'appData'
+          .doc('appData') 
           .get();
-
-      // Check if the document exists and contains the 'appEmail' field
       if (document.exists && document['appEmail'] != null) {
         return document['appEmail'];
       } else {
-        return 'travellbuddyfinder@gmail.com@gmail.com'; // default email
+        return 'travellbuddyfinder@gmail.com@gmail.com'; 
       }
     } catch (e) {
-      return 'travellbuddyfinder@gmail.com@gmail.com'; //
+      return 'travellbuddyfinder@gmail.com@gmail.com'; 
     }
   }
 
-  // Launch the email client with the fetched email
   void _launchEmail(String email) {
     launchUrl(Uri(
       scheme: 'mailto',

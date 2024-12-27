@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:explore_together/user/screens/user_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -33,6 +35,7 @@ class HomePageState extends State<HomePage> {
   bool isSearchTriggered = false;
   bool isLoading = false;
   bool hasMorePosts = true;
+  bool isOffline = false;
 
   List<DocumentSnapshot> posts = [];
   Map<String, Map<String, dynamic>> users = {};
@@ -40,12 +43,42 @@ class HomePageState extends State<HomePage> {
   DocumentSnapshot? _lastDocument;
   final int _pageSize = 5;
 
+  late StreamSubscription<List<ConnectivityResult>> connectivitySubscription;
+
   @override
   void initState() {
     super.initState();
     fetchSuggestions();
+    _initializeConnectivity();
     _scrollController.addListener(_onScroll);
     _fetchInitialPosts();
+  }
+
+  Future<void> _initializeConnectivity() async {
+    try {
+      // Check initial connectivity state
+      final connectivityResult = await Connectivity().checkConnectivity();
+
+      // Update the UI with initial state
+      if (mounted) {
+        setState(() {
+          isOffline = connectivityResult == ConnectivityResult.none;
+        });
+      }
+
+      // Set up listener for future connectivity changes
+      connectivitySubscription = Connectivity()
+          .onConnectivityChanged
+          .listen((List<ConnectivityResult> results) {
+        if (mounted) {
+          setState(() {
+            isOffline = results.contains(ConnectivityResult.none);
+          });
+        }
+      });
+    } catch (e) {
+      print('Error initializing connectivity: $e');
+    }
   }
 
   Future<void> fetchSuggestions() async {
@@ -78,10 +111,8 @@ class HomePageState extends State<HomePage> {
       final randomQuery = await FirebaseFirestore.instance
           .collection('post')
           .orderBy(FieldPath.documentId)
-          .limit(_pageSize) // Fetch extra posts for better shuffling
+          .limit(_pageSize)
           .get();
-
-      // Filter out already shown posts
       final filteredDocs = randomQuery.docs
           .where((doc) => !shownPostIds.contains(doc.id))
           .toList();
@@ -205,7 +236,6 @@ class HomePageState extends State<HomePage> {
 
       if (querySnapshot.docs.isEmpty) {
         if (mounted) {
-          // Check if the widget is still mounted
           setState(() {
             hasMorePosts = false;
             isLoading = false;
@@ -237,7 +267,6 @@ class HomePageState extends State<HomePage> {
 
       if (filteredPosts.isEmpty) {
         if (mounted) {
-          // Check if the widget is still mounted
           setState(() {
             hasMorePosts = false;
             isLoading = false;
@@ -270,9 +299,9 @@ class HomePageState extends State<HomePage> {
     if (_scrollController.position.pixels ==
         _scrollController.position.maxScrollExtent) {
       if (_searchQuery.isNotEmpty) {
-        _searchPosts(); // Fetch more search results
+        _searchPosts();
       } else {
-        _fetchMorePosts(); // Fetch more random posts
+        _fetchMorePosts();
       }
     }
   }
@@ -292,6 +321,7 @@ class HomePageState extends State<HomePage> {
     _scrollController.removeListener(_onScroll);
     _searchController.dispose();
     _scrollController.dispose();
+    connectivitySubscription.cancel();
     super.dispose();
   }
 
@@ -303,25 +333,32 @@ class HomePageState extends State<HomePage> {
         child: AppBar(
           toolbarHeight: kToolbarHeight + 10.0,
           title: TextField(
+            enabled: !isOffline,
             controller: _searchController,
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value;
-                isSearchTriggered = false;
-              });
-            },
-            onSubmitted: (value) {
-              setState(() {
-                _searchQuery = value;
-                isSearchTriggered = true;
-                _searchPosts();
-              });
-            },
+            onChanged: isOffline
+                ? null
+                : (value) {
+                    setState(() {
+                      _searchQuery = value;
+                      isSearchTriggered = false;
+                    });
+                  },
+            onSubmitted: isOffline
+                ? null 
+                : (value) {
+                    setState(() {
+                      _searchQuery = value;
+                      isSearchTriggered = true;
+                      _searchPosts();
+                    });
+                  },
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.white,
-              hintText: 'Search...',
-              hintStyle: TextStyle(color: Colors.grey[500], fontSize: 16),
+              hintText: isOffline ? 'You are offline' : 'Search...',
+              hintStyle: isOffline
+                  ? TextStyle(color: Colors.red[500], fontSize: 16)
+                  : TextStyle(color: Colors.grey[500], fontSize: 16),
               prefixIcon: Icon(
                 Icons.search,
                 color: Colors.grey[600],
@@ -332,14 +369,16 @@ class HomePageState extends State<HomePage> {
                         Icons.clear,
                         color: Colors.grey[600],
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _searchController.clear();
-                          _searchQuery = "";
-                          isSearchTriggered = false;
-                          _fetchInitialPosts();
-                        });
-                      },
+                      onPressed: isOffline
+                          ? null // Disable clearing search when offline
+                          : () {
+                              setState(() {
+                                _searchController.clear();
+                                _searchQuery = "";
+                                isSearchTriggered = false;
+                                _fetchInitialPosts();
+                              });
+                            },
                     )
                   : null,
               contentPadding:
@@ -436,7 +475,7 @@ class HomePageState extends State<HomePage> {
                   if (!suggestion
                       .toLowerCase()
                       .contains(_searchQuery.toLowerCase())) {
-                    return SizedBox.shrink();
+                    return const SizedBox.shrink();
                   }
                   return ListTile(
                     title: Text(suggestion),
@@ -460,13 +499,31 @@ class HomePageState extends State<HomePage> {
                     ),
                   )
                 : RefreshIndicator(
-                    onRefresh: _refreshPosts,
+                    onRefresh: isOffline ? () async {} : _refreshPosts,
                     child: ListView.builder(
                       controller: _scrollController,
                       itemCount: posts.length + (isLoading ? 1 : 0),
                       itemBuilder: (context, index) {
                         if (index == posts.length) {
-                          return Center(child: LoadingAnimation());
+                          return Center(
+                            child: isOffline
+                                ? const Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        'You are offline',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      SizedBox(height: 10),
+                                      LoadingAnimation(),
+                                    ],
+                                  )
+                                : const LoadingAnimation(),
+                          );
                         }
 
                         var post = posts[index].data() as Map<String, dynamic>;
@@ -524,7 +581,7 @@ class HomePageState extends State<HomePage> {
                                                 context,
                                                 MaterialPageRoute(
                                                     builder: (context) =>
-                                                        UserScreen(
+                                                        const UserScreen(
                                                             initialIndex: 4)),
                                               );
                                             } else {
@@ -559,7 +616,7 @@ class HomePageState extends State<HomePage> {
                                                 backgroundColor:
                                                     Colors.transparent,
                                               ))),
-                                      SizedBox(width: 10),
+                                      const SizedBox(width: 10),
                                       GestureDetector(
                                         onTap: () {
                                           if (userId == currentUserId) {
@@ -567,7 +624,7 @@ class HomePageState extends State<HomePage> {
                                               context,
                                               MaterialPageRoute(
                                                   builder: (context) =>
-                                                      UserScreen(
+                                                      const UserScreen(
                                                           initialIndex: 4)),
                                             );
                                           } else {
@@ -589,21 +646,16 @@ class HomePageState extends State<HomePage> {
                                       ),
                                     ],
                                   ),
-                                  SizedBox(height: 10),
-                                  Container(
+                                  const SizedBox(height: 10),
+                                  SizedBox(
                                     height: 250,
                                     width: double.infinity,
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.circular(15),
-                                      child: CachedNetworkImage(
-                                        imageUrl: locationImages[0],
+                                      child: Image(
+                                        image: CachedNetworkImageProvider(
+                                            locationImages[0]),
                                         fit: BoxFit.cover,
-                                        placeholder: (context, url) =>
-                                            const Center(
-                                                child:
-                                                    CircularProgressIndicator()),
-                                        errorWidget: (context, url, error) =>
-                                            Icon(Icons.error, size: 50),
                                       ),
                                     ),
                                   ),

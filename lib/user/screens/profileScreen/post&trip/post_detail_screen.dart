@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
@@ -67,6 +68,7 @@ class _CurrentUserPostDetailScreenState
             final locationImages = postData['locationImages'] ?? [];
             final visitedPalaces = postData['visitedPlaces'] ?? [];
             final planToVisitPlaces = postData['planToVisitPlaces'];
+            final tripCompletedDuration = postData['tripCompletedDuration'];
 
             return Padding(
               padding: const EdgeInsets.all(8.0),
@@ -122,14 +124,14 @@ class _CurrentUserPostDetailScreenState
                           children: [
                             Text(
                               'Trip to $locationName ',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 8.0),
+                            const SizedBox(height: 8.0),
                             // Container ensures wrapping and centers content
-                            Container(
+                            SizedBox(
                               width: MediaQuery.of(context).size.width *
                                   0.8, // Limit width for wrapping
                               child: Text(
@@ -141,32 +143,32 @@ class _CurrentUserPostDetailScreenState
                                 maxLines: 3, // Limit the number of lines
                                 overflow: TextOverflow
                                     .ellipsis, // Show ellipsis if text overflows
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 10,
                                 ),
                               ),
                             ),
-                            SizedBox(height: 10.0),
+                            const SizedBox(height: 10.0),
                           ],
                         ),
                       ],
                     ),
-                    Divider(
+                    const Divider(
                       color: Colors.black, // Color of the line
                       thickness: 2.0, // Thickness of the line
                       indent: 20.0, // Space before the line
                       endIndent: 20.0, // Space after the line
                     ),
-                    SizedBox(height: 10.0),
+                    const SizedBox(height: 10.0),
                     if (!isTripCompleted) ...[
                       Center(
                         child: Text(
                           'Trip Duration Plan : $tripDuration days',
-                          style: TextStyle(
+                          style: const TextStyle(
                               fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                       ),
-                      SizedBox(height: 8.0),
+                      const SizedBox(height: 8.0),
                       if (planToVisitPlaces.isNotEmpty) ...[
                         Padding(
                           padding: const EdgeInsets.all(8.0),
@@ -186,10 +188,8 @@ class _CurrentUserPostDetailScreenState
                               const SizedBox(height: 8.0),
                               LayoutBuilder(
                                 builder: (context, constraints) {
-                                  // Calculate the number of columns based on available width
                                   final crossAxisCount =
-                                      (constraints.maxWidth / 100)
-                                          .floor(); // Adjust 100 for cell width
+                                      (constraints.maxWidth / 100).floor();
                                   return GridView.builder(
                                     shrinkWrap: true,
                                     physics:
@@ -223,8 +223,7 @@ class _CurrentUserPostDetailScreenState
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,
                                             ),
-                                            textAlign: TextAlign
-                                                .center, // Optional for multiline text
+                                            textAlign: TextAlign.center,
                                           ),
                                         ),
                                       );
@@ -236,15 +235,12 @@ class _CurrentUserPostDetailScreenState
                           ),
                         ),
                       ],
-                      SizedBox(height: 8.0),
+                      const SizedBox(height: 8.0),
                     ],
-
-                    // Trip completion details
                     if (isTripCompleted) ...[
                       Container(
-                        width: double
-                            .infinity, // Makes the container take up full width
-                        padding: EdgeInsets.all(8.0),
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(8.0),
                         decoration: BoxDecoration(
                           color: Colors.green[100],
                           borderRadius: BorderRadius.circular(12),
@@ -254,8 +250,7 @@ class _CurrentUserPostDetailScreenState
                           ),
                         ),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment
-                              .center, // Center align all children horizontally
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Text(
@@ -265,13 +260,13 @@ class _CurrentUserPostDetailScreenState
                                   fontWeight: FontWeight.bold,
                                   color: Colors.green),
                             ),
-                            SizedBox(height: 8.0),
+                            const SizedBox(height: 8.0),
                             if (tripBuddies.isNotEmpty) ...[
                               GridView.builder(
                                 shrinkWrap: true,
                                 gridDelegate:
                                     const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 3, // Two items in each row
+                                  crossAxisCount: 3,
                                   crossAxisSpacing: 10.0,
                                   mainAxisSpacing: 10.0,
                                 ),
@@ -306,7 +301,7 @@ class _CurrentUserPostDetailScreenState
                                                 context,
                                                 MaterialPageRoute(
                                                   builder: (context) =>
-                                                      UserScreen(
+                                                      const UserScreen(
                                                           initialIndex: 4),
                                                 ),
                                               );
@@ -319,16 +314,15 @@ class _CurrentUserPostDetailScreenState
                                                   BorderRadius.circular(10.0),
                                             ),
                                             color: AppColors.genderBorderColor(
-                                                gender), // Set grid background color based on gender
+                                                gender),
                                             child: Column(
                                               children: [
-                                                const SizedBox(
-                                                    height:
-                                                        20.0), // Add top padding to create space between image and grid
+                                                const SizedBox(height: 20.0),
                                                 CircleAvatar(
                                                   radius: 25.0,
-                                                  backgroundImage: NetworkImage(
-                                                      buddy['userimage']),
+                                                  backgroundImage:
+                                                      CachedNetworkImageProvider(
+                                                          buddy['userimage']),
                                                 ),
                                                 const SizedBox(width: 10.0),
                                                 Expanded(
@@ -376,11 +370,9 @@ class _CurrentUserPostDetailScreenState
                                     const SizedBox(height: 8.0),
                                     LayoutBuilder(
                                       builder: (context, constraints) {
-                                        // Calculate the number of columns based on available width
-                                        final crossAxisCount = (constraints
-                                                    .maxWidth /
-                                                100)
-                                            .floor(); // Adjust 100 for cell width
+                                        final crossAxisCount =
+                                            (constraints.maxWidth / 100)
+                                                .floor();
                                         return GridView.builder(
                                           shrinkWrap: true,
                                           physics:
@@ -392,8 +384,7 @@ class _CurrentUserPostDetailScreenState
                                                 : 1,
                                             crossAxisSpacing: 8.0,
                                             mainAxisSpacing: 8.0,
-                                            childAspectRatio:
-                                                2, // Adjust to decrease cell height
+                                            childAspectRatio: 2,
                                           ),
                                           itemCount: visitedPalaces.length,
                                           itemBuilder: (context, index) {
@@ -409,15 +400,13 @@ class _CurrentUserPostDetailScreenState
                                                     BorderRadius.circular(8.0),
                                               ),
                                               child: Center(
-                                                // Center aligns the text in the middle
                                                 child: Text(
                                                   visitedPalaces[index],
                                                   style: const TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.bold,
                                                   ),
-                                                  textAlign: TextAlign
-                                                      .center, // Optional for multiline text
+                                                  textAlign: TextAlign.center,
                                                 ),
                                               ),
                                             );
@@ -428,7 +417,7 @@ class _CurrentUserPostDetailScreenState
                                   ],
                                 ),
                               ),
-                            SizedBox(height: 8.0),
+                            const SizedBox(height: 8.0),
                             if (tripRating != null)
                               RatingBar.builder(
                                 initialRating: tripRating,
@@ -445,13 +434,18 @@ class _CurrentUserPostDetailScreenState
                                   print(rating);
                                 },
                               ),
-                            SizedBox(height: 20.0),
+                            const SizedBox(height: 20.0),
                             if (tripFeedback != null)
                               Text(
                                 'Feedback : $tripFeedback',
-                                style: TextStyle(fontSize: 16),
+                                style: const TextStyle(fontSize: 16),
                               ),
-                            SizedBox(height: 8.0),
+                            const SizedBox(height: 8.0),
+                            if (tripCompletedDuration != null)
+                              Text(
+                                'Trip Duration : $tripCompletedDuration',
+                                style: const TextStyle(fontSize: 16),
+                              ),
                           ],
                         ),
                       ),
@@ -465,9 +459,102 @@ class _CurrentUserPostDetailScreenState
                         children: [
                           ElevatedButton.icon(
                             onPressed: () async {
-                              await UserPostServices()
-                                  .deletePost(widget.postId);
-                              Navigator.pop(context);
+                              // Show confirmation dialog
+                              showDialog(
+                                context: context,
+                                builder: (BuildContext context) {
+                                  return AlertDialog(
+                                    backgroundColor: Colors
+                                        .white, // Set background color for the dialog
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                          12.0), // Rounded corners
+                                    ),
+                                    title: Row(
+                                      children: [
+                                        Icon(Icons.delete_forever,
+                                            color: Colors
+                                                .redAccent), // Add icon to the title
+                                        SizedBox(width: 10),
+                                        Text(
+                                          'Delete Post',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color:
+                                                Colors.redAccent, // Title color
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          'Are you sure you want to delete this post?',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            color: Colors
+                                                .black87, // Content text color
+                                          ),
+                                        ),
+                                        SizedBox(height: 10),
+                                        Text(
+                                          'This action is irreversible. The post will be permanently deleted.',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors
+                                                .grey, // Additional explanation
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.of(context)
+                                              .pop(); // Close dialog without deleting
+                                        },
+                                        child: Text(
+                                          'Cancel',
+                                          style: TextStyle(
+                                            color: Colors
+                                                .blue, // Cancel button color
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () async {
+                                          // Proceed with deleting the post
+                                          await UserPostServices()
+                                              .deletePost(widget.postId);
+                                          if (context.mounted) {
+                                            Navigator.pop(
+                                                context); // Close confirmation dialog
+                                          }
+                                        },
+                                        child: Text(
+                                          'Delete',
+                                          style: TextStyle(
+                                            color: Colors
+                                                .white, // Text color for the delete button
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors
+                                              .redAccent, // Background color for delete button
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
                             },
                             icon: const Icon(
                               Icons.remove_circle_outline,
@@ -533,7 +620,7 @@ class _CurrentUserPostDetailScreenState
               ),
             );
           } else {
-            return Center(child: Text('No data found.'));
+            return const Center(child: Text('No data found.'));
           }
         },
       ),

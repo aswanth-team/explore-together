@@ -3,8 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../utils/loading.dart';
 
 class ReportDialog extends StatefulWidget {
-  final String userId; // The user being reported
-  final String currentUserId; // The user reporting
+  final String userId;
+  final String currentUserId;
 
   const ReportDialog(
       {super.key, required this.userId, required this.currentUserId});
@@ -15,15 +15,14 @@ class ReportDialog extends StatefulWidget {
 
 class ReportDialogState extends State<ReportDialog> {
   final TextEditingController descriptionController = TextEditingController();
-  bool _isLoading = false; // Loading state
+  bool _isLoading = false;
 
   void report(String description) async {
     setState(() {
-      _isLoading = true; // Show loading animation
+      _isLoading = true;
     });
 
     try {
-      // Save the report to Firestore
       await FirebaseFirestore.instance.collection('reports').add({
         'reportedTime': FieldValue.serverTimestamp(),
         'reportedUser': widget.userId,
@@ -44,7 +43,7 @@ class ReportDialogState extends State<ReportDialog> {
       }
     } finally {
       setState(() {
-        _isLoading = false; // Hide loading animation
+        _isLoading = false;
       });
     }
   }
@@ -111,7 +110,7 @@ class ReportDialogState extends State<ReportDialog> {
                       onPressed: () {
                         final description = descriptionController.text.trim();
                         if (description.isNotEmpty) {
-                          report(description); // Save the report
+                          report(description);
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
